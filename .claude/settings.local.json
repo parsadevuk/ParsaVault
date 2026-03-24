@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dart run:*)",
+      "Bash(dart -e \":*)",
+      "Bash(DART=\"/c/Users/Parsa Dev/Documents/Flutter/flutter/bin/dart\")",
+      "Bash(\"$DART\" -e \":*)",
+      "Bash(\"/c/Users/Parsa Dev/Documents/Flutter/flutter/bin/dart\" --version)",
+      "Bash(\"/c/Users/Parsa Dev/Documents/Flutter/flutter/bin/cache/dart-sdk/bin/dart.exe\" /tmp/mklogo.dart)",
+      "Bash(\"/c/Users/Parsa Dev/Documents/Flutter/flutter/bin/flutter\" pub get)",
+      "Bash(\"/c/Users/Parsa Dev/Documents/Flutter/flutter/bin/flutter\" analyze)",
+      "Bash(\"/c/Users/Parsa Dev/Documents/Flutter/flutter/bin/flutter\" analyze lib/)"
+    ]
+  }
+}
