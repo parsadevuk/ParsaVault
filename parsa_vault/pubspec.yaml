@@ -24,6 +24,9 @@ dependencies:
   crypto: ^3.0.6
   intl: ^0.20.2
 
+  # Image picker for profile picture
+  image_picker: ^1.1.2
+
   # UI
   google_fonts: ^6.2.1
   fl_chart: ^0.69.0

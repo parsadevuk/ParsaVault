@@ -45,15 +45,11 @@ class UserRepository {
     return User.fromMap(maps.first);
   }
 
-  Future<bool> emailExists(String email) async {
-    final user = await findByEmail(email);
-    return user != null;
-  }
+  Future<bool> emailExists(String email) async =>
+      (await findByEmail(email)) != null;
 
-  Future<bool> usernameExists(String username) async {
-    final user = await findByUsername(username);
-    return user != null;
-  }
+  Future<bool> usernameExists(String username) async =>
+      (await findByUsername(username)) != null;
 
   Future<bool> anyUsersExist() async {
     final db = await _db.database;
@@ -68,12 +64,8 @@ class UserRepository {
 
   Future<void> update(User user) async {
     final db = await _db.database;
-    await db.update(
-      'users',
-      user.toMap(),
-      where: 'id = ?',
-      whereArgs: [user.id],
-    );
+    await db.update('users', user.toMap(),
+        where: 'id = ?', whereArgs: [user.id]);
   }
 
   Future<void> updateFinancials({
@@ -115,6 +107,20 @@ class UserRepository {
       'users',
       {
         'password_hash': newHash,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<void> updateProfilePicture(
+      String userId, String? base64Image) async {
+    final db = await _db.database;
+    await db.update(
+      'users',
+      {
+        'profile_picture': base64Image,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',

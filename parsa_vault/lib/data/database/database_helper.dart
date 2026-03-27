@@ -18,8 +18,9 @@ class DatabaseHelper {
     final path = join(dbPath, AppConstants.dbName);
     return openDatabase(
       path,
-      version: AppConstants.dbVersion,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -35,6 +36,7 @@ class DatabaseHelper {
         cash_balance REAL NOT NULL DEFAULT 10000.0,
         xp INTEGER NOT NULL DEFAULT 0,
         level INTEGER NOT NULL DEFAULT 1,
+        profile_picture TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         last_login_at TEXT
@@ -83,5 +85,18 @@ class DatabaseHelper {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     ''');
+  }
+
+  // Migrate existing v1 databases to v2
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add profile_picture column to existing users table
+      try {
+        await db.execute(
+            'ALTER TABLE users ADD COLUMN profile_picture TEXT');
+      } catch (_) {
+        // Column may already exist — safe to ignore
+      }
+    }
   }
 }

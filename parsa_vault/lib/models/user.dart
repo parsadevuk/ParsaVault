@@ -8,6 +8,7 @@ class User {
   final double cashBalance;
   final int xp;
   final int level;
+  final String? profilePicture; // base64 encoded image
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? lastLoginAt;
@@ -22,6 +23,7 @@ class User {
     required this.cashBalance,
     required this.xp,
     required this.level,
+    this.profilePicture,
     required this.createdAt,
     required this.updatedAt,
     this.lastLoginAt,
@@ -37,6 +39,8 @@ class User {
     double? cashBalance,
     int? xp,
     int? level,
+    String? profilePicture,
+    bool clearProfilePicture = false,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? lastLoginAt,
@@ -51,6 +55,8 @@ class User {
       cashBalance: cashBalance ?? this.cashBalance,
       xp: xp ?? this.xp,
       level: level ?? this.level,
+      profilePicture:
+          clearProfilePicture ? null : (profilePicture ?? this.profilePicture),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
@@ -68,6 +74,7 @@ class User {
       'cash_balance': cashBalance,
       'xp': xp,
       'level': level,
+      'profile_picture': profilePicture,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'last_login_at': lastLoginAt?.toIso8601String(),
@@ -85,6 +92,7 @@ class User {
       cashBalance: (map['cash_balance'] as num).toDouble(),
       xp: map['xp'] as int,
       level: map['level'] as int,
+      profilePicture: map['profile_picture'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       lastLoginAt: map['last_login_at'] != null
