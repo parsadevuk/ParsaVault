@@ -14,7 +14,6 @@ import '../../widgets/buttons/gold_button.dart';
 
 class TradeScreen extends ConsumerStatefulWidget {
   final Asset asset;
-
   const TradeScreen({super.key, required this.asset});
 
   @override
@@ -23,13 +22,16 @@ class TradeScreen extends ConsumerStatefulWidget {
 
 class _TradeScreenState extends ConsumerState<TradeScreen> {
   bool _isBuying = true;
-  final _sharesCtrl = TextEditingController();
+  bool _isAmountMode = false; // false = shares, true = $ amount
+  final _inputCtrl = TextEditingController();
+  final _focusNode = FocusNode();
   String? _inputError;
   String _selectedRange = '1D';
 
   @override
   void dispose() {
-    _sharesCtrl.dispose();
+    _inputCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -43,23 +45,34 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
       .where((h) => h.symbol == widget.asset.symbol)
       .firstOrNull;
 
-  double get _shares =>
-      double.tryParse(_sharesCtrl.text.trim()) ?? 0;
+  // Shares entered or calculated from amount
+  double get _shares {
+    final raw = double.tryParse(_inputCtrl.text.trim()) ?? 0;
+    if (_isAmountMode) {
+      final price = _liveAsset.currentPrice;
+      return price > 0 ? raw / price : 0;
+    }
+    return raw;
+  }
 
   double get _estimatedTotal => _shares * _liveAsset.currentPrice;
 
   void _validate() {
     final user = ref.read(authProvider).user;
     if (user == null) return;
+    final raw = double.tryParse(_inputCtrl.text.trim()) ?? 0;
     setState(() {
-      if (_sharesCtrl.text.trim().isEmpty || _shares <= 0) {
-        _inputError = 'Enter how many shares you want.';
+      if (_inputCtrl.text.trim().isEmpty || raw <= 0) {
+        _inputError = _isAmountMode
+            ? 'Enter an amount in dollars.'
+            : 'Enter how many shares you want.';
       } else if (_isBuying && _estimatedTotal > user.cashBalance) {
         _inputError =
             "Not enough cash. You have ${AppFormatters.currency(user.cashBalance)}.";
       } else if (!_isBuying) {
         final owned = _holding?.shares ?? 0;
-        if (_shares > owned) {
+        // Use a tiny tolerance to absorb floating-point rounding from % buttons
+        if (_shares > owned + 0.000001) {
           _inputError =
               'You only own ${AppFormatters.shares(owned)} shares.';
         } else {
@@ -71,9 +84,47 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
     });
   }
 
+  void _applyPercentage(double pct) {
+    final price = _liveAsset.currentPrice;
+    if (_isBuying) {
+      // Buy: percentage of available cash balance
+      final cash = ref.read(authProvider).user?.cashBalance ?? 0;
+      if (cash <= 0 || price <= 0) return;
+      if (_isAmountMode) {
+        _inputCtrl.text = (cash * pct).toStringAsFixed(2);
+      } else {
+        _inputCtrl.text = _trimTo3((cash * pct) / price);
+      }
+    } else {
+      // Sell: percentage of owned shares
+      final owned = _holding?.shares ?? 0;
+      if (owned <= 0) return;
+      final sharesAmount = owned * pct;
+      final trimmed = _trimTo3(sharesAmount);
+
+      // If the holding is a tiny fraction that 3dp can't represent (e.g. 0.000438),
+      // auto-switch to $ Amount mode so the user can still sell it.
+      if (!_isAmountMode && (trimmed.isEmpty || double.tryParse(trimmed) == 0)) {
+        setState(() => _isAmountMode = true);
+        _inputCtrl.text = (sharesAmount * price).toStringAsFixed(2);
+      } else if (_isAmountMode) {
+        _inputCtrl.text = (sharesAmount * price).toStringAsFixed(2);
+      } else {
+        _inputCtrl.text = trimmed;
+      }
+    }
+    _validate();
+  }
+
+  String _trimTo3(double val) {
+    // Show up to 3 decimal places, strip trailing zeros
+    final s = val.toStringAsFixed(3);
+    return s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  }
+
   Future<void> _confirmTrade() async {
     _validate();
-    if (_inputError != null) return;
+    if (_inputError != null || _shares <= 0) return;
 
     final asset = _liveAsset;
     final portfolio = ref.read(portfolioProvider.notifier);
@@ -98,23 +149,25 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
     }
 
     if (!mounted) return;
-
     if (success) {
-      final msg = ref.read(portfolioProvider).successMessage ?? 'Trade done.';
+      final msg =
+          ref.read(portfolioProvider).successMessage ?? 'Trade done.';
       ref.read(portfolioProvider.notifier).clearMessages();
-      _sharesCtrl.clear();
+      _inputCtrl.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
           backgroundColor: AppColors.nearBlack,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           duration: const Duration(seconds: 3),
         ),
       );
       Navigator.of(context).pop();
     } else {
-      final error = ref.read(portfolioProvider).error ?? 'Something went wrong.';
+      final error =
+          ref.read(portfolioProvider).error ?? 'Something went wrong.';
       ref.read(portfolioProvider.notifier).clearMessages();
       setState(() => _inputError = error);
     }
@@ -122,235 +175,353 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final asset = ref.watch(marketProvider).findBySymbol(widget.asset.symbol) ??
-        widget.asset;
+    final asset =
+        ref.watch(marketProvider).findBySymbol(widget.asset.symbol) ??
+            widget.asset;
     final user = ref.watch(authProvider).user;
     final portfolioState = ref.watch(portfolioProvider);
     final holding = portfolioState.holdings
         .where((h) => h.symbol == asset.symbol)
         .firstOrNull;
 
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      appBar: AppBar(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
         backgroundColor: AppColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.nearBlack, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
+        appBar: AppBar(
+          backgroundColor: AppColors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: AppColors.nearBlack, size: 18),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(asset.symbol, style: AppTextStyles.cardTitle),
+          centerTitle: true,
         ),
-        title: Text(asset.symbol, style: AppTextStyles.cardTitle),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Asset name
-            Text(asset.name,
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.mediumGrey)),
-            const SizedBox(height: 8),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Asset name
+              Text(asset.name,
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.mediumGrey)),
+              const SizedBox(height: 8),
 
-            // Price
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(AppFormatters.price(asset.currentPrice),
-                    style: AppTextStyles.priceLarge),
-                const SizedBox(width: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: asset.isUp
-                        ? AppColors.successGreen.withValues(alpha: 0.1)
-                        : AppColors.dangerRed.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+              // Price + change badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(AppFormatters.price(asset.currentPrice),
+                      style: AppTextStyles.priceLarge),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: asset.isUp
+                          ? AppColors.successGreen.withValues(alpha: 0.1)
+                          : AppColors.dangerRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      AppFormatters.percentage(asset.changePercent24h),
+                      style: asset.isUp
+                          ? AppTextStyles.percentageUp
+                          : AppTextStyles.percentageDown,
+                    ),
                   ),
-                  child: Text(
-                    AppFormatters.percentage(asset.changePercent24h),
-                    style: asset.isUp
-                        ? AppTextStyles.percentageUp
-                        : AppTextStyles.percentageDown,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${asset.isUp ? '+' : ''}${AppFormatters.currency(asset.change24h)} today',
-              style: AppTextStyles.caption,
-            ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${asset.isUp ? '+' : ''}${AppFormatters.currency(asset.change24h)} today',
+                style: AppTextStyles.caption,
+              ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+              _PriceChart(asset: asset),
 
-            // Chart
-            _PriceChart(asset: asset, selectedRange: _selectedRange),
-
-            // Time range selector
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: ['1D', '1W', '1M', '3M'].map((range) {
-                  final active = _selectedRange == range;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedRange = range),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: active ? AppColors.gold : AppColors.lightGrey,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        range,
-                        style: AppTextStyles.caption.copyWith(
-                          color:
-                              active ? Colors.white : AppColors.mediumGrey,
-                          fontWeight: FontWeight.w600,
+              // Time range selector
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: ['1D', '1W', '1M', '3M'].map((range) {
+                    final active = _selectedRange == range;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedRange = range),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? AppColors.gold
+                              : AppColors.lightGrey,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          range,
+                          style: AppTextStyles.caption.copyWith(
+                            color: active
+                                ? Colors.white
+                                : AppColors.mediumGrey,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              // Buy / Sell toggle
+              Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.lightGrey,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    _ToggleOption(
+                      label: 'Buy',
+                      active: _isBuying,
+                      onTap: () =>
+                          setState(() => _isBuying = true),
                     ),
-                  );
-                }).toList(),
+                    _ToggleOption(
+                      label: 'Sell',
+                      active: !_isBuying,
+                      onTap: () =>
+                          setState(() => _isBuying = false),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 8),
-
-            // Buy / Sell toggle
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.lightGrey,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
+              // Shares / Amount toggle
+              Row(
                 children: [
-                  _ToggleOption(
-                    label: 'Buy',
-                    active: _isBuying,
-                    onTap: () => setState(() => _isBuying = true),
+                  Text('Enter by', style: AppTextStyles.caption),
+                  const SizedBox(width: 10),
+                  _ModeChip(
+                    label: 'Shares',
+                    active: !_isAmountMode,
+                    onTap: () {
+                      setState(() => _isAmountMode = false);
+                      _inputCtrl.clear();
+                    },
                   ),
-                  _ToggleOption(
-                    label: 'Sell',
-                    active: !_isBuying,
-                    onTap: () => setState(() => _isBuying = false),
+                  const SizedBox(width: 6),
+                  _ModeChip(
+                    label: 'Amount (\$)',
+                    active: _isAmountMode,
+                    onTap: () {
+                      setState(() => _isAmountMode = true);
+                      _inputCtrl.clear();
+                    },
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
 
-            const SizedBox(height: 20),
+              // Input field
+              Text(
+                _isAmountMode ? 'Dollar amount' : 'Number of shares',
+                style: AppTextStyles.label,
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _inputCtrl,
+                focusNode: _focusNode,
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true),
+                inputFormatters: [
+                  // Allow digits + one dot + max 3 decimal places
+                  FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,3}')),
+                ],
+                style: AppTextStyles.priceLarge.copyWith(fontSize: 26),
+                textAlign: TextAlign.center,
+                onChanged: (_) => _validate(),
+                textInputAction: TextInputAction.done,
+                onEditingComplete: () =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
+                decoration: InputDecoration(
+                  hintText: _isAmountMode ? '0.00' : '0.000',
+                  hintStyle: AppTextStyles.priceLarge.copyWith(
+                      fontSize: 26, color: AppColors.borderGrey),
+                  prefixText: _isAmountMode ? '\$  ' : null,
+                  prefixStyle: AppTextStyles.label
+                      .copyWith(color: AppColors.mediumGrey),
+                  errorText: _inputError,
+                  errorStyle: AppTextStyles.errorText,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: AppColors.borderGrey),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.gold, width: 1.5),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.dangerRed, width: 1.5),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.dangerRed, width: 1.5),
+                  ),
+                  // Done button inside field for number keyboards
+                  suffixIcon: GestureDetector(
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    child: Container(
+                      margin: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.lightGrey,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('Done',
+                          style: AppTextStyles.caption
+                              .copyWith(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ),
 
-            // Input
-            Text('Number of shares', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _sharesCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              // Quick percentage buttons (buy = % of cash, sell = % of holding)
+              if (_isBuying || holding != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: ['10%', '25%', '50%', 'Max'].map((label) {
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          double pct;
+                          switch (label) {
+                            case '10%':
+                              pct = 0.10;
+                              break;
+                            case '25%':
+                              pct = 0.25;
+                              break;
+                            case '50%':
+                              pct = 0.50;
+                              break;
+                            default:
+                              pct = 1.0;
+                          }
+                          _applyPercentage(pct);
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          decoration: BoxDecoration(
+                            color: AppColors.goldLight,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.3)),
+                          ),
+                          child: Center(
+                            child: Text(
+                              label,
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: AppColors.darkGold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ],
-              style: AppTextStyles.priceLarge.copyWith(fontSize: 28),
-              textAlign: TextAlign.center,
-              onChanged: (_) => _validate(),
-              decoration: InputDecoration(
-                hintText: '0',
-                hintStyle: AppTextStyles.priceLarge
-                    .copyWith(fontSize: 28, color: AppColors.borderGrey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.borderGrey),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.gold, width: 1.5),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                      color: AppColors.dangerRed, width: 1.5),
-                ),
-                errorText: _inputError,
-                errorStyle: AppTextStyles.errorText,
-              ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Summary
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.softWhite,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _SummaryRow(
-                    label: 'Price per share',
-                    value: AppFormatters.price(asset.currentPrice),
-                  ),
-                  const SizedBox(height: 8),
-                  _SummaryRow(
-                    label: 'Estimated total',
-                    value: AppFormatters.currency(_estimatedTotal),
-                    bold: true,
-                  ),
-                  const Divider(height: 16),
-                  if (_isBuying && user != null)
+              // Summary card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.softWhite,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
                     _SummaryRow(
-                      label: 'Cash available',
-                      value: AppFormatters.currency(user.cashBalance),
-                    )
-                  else if (!_isBuying && holding != null)
-                    _SummaryRow(
-                      label: 'Shares owned',
-                      value: AppFormatters.shares(holding.shares),
+                      label: 'Price per share',
+                      value: AppFormatters.price(asset.currentPrice),
                     ),
-                ],
+                    const SizedBox(height: 8),
+                    if (_isAmountMode)
+                      _SummaryRow(
+                        label: 'Shares you will get',
+                        value: AppFormatters.shares(_shares),
+                        bold: true,
+                      )
+                    else
+                      _SummaryRow(
+                        label: 'Estimated total',
+                        value: AppFormatters.currency(_estimatedTotal),
+                        bold: true,
+                      ),
+                    const Divider(height: 16),
+                    if (_isBuying && user != null)
+                      _SummaryRow(
+                        label: 'Cash available',
+                        value: AppFormatters.currency(user.cashBalance),
+                      )
+                    else if (!_isBuying && holding != null)
+                      _SummaryRow(
+                        label: 'Shares owned',
+                        value: AppFormatters.shares(holding.shares),
+                      ),
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            GoldButton(
-              label: _isBuying ? 'Confirm Buy' : 'Confirm Sell',
-              onPressed: _confirmTrade,
-              isLoading: portfolioState.isLoading,
-            ),
-
-            const SizedBox(height: 32),
-          ],
+              GoldButton(
+                label: _isBuying ? 'Confirm Buy' : 'Confirm Sell',
+                onPressed: _confirmTrade,
+                isLoading: portfolioState.isLoading,
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// ── Chart ──────────────────────────────────────────────────────────────────────
 class _PriceChart extends StatelessWidget {
   final Asset asset;
-  final String selectedRange;
-
-  const _PriceChart({required this.asset, required this.selectedRange});
+  const _PriceChart({required this.asset});
 
   @override
   Widget build(BuildContext context) {
     if (asset.priceHistory.isEmpty) {
       return const SizedBox(
-        height: 180,
+        height: 160,
         child: Center(
-          child: CircularProgressIndicator(color: AppColors.gold),
-        ),
+            child: CircularProgressIndicator(color: AppColors.gold)),
       );
     }
 
@@ -364,9 +535,11 @@ class _PriceChart extends StatelessWidget {
         spots.map((s) => s.y).reduce((a, b) => a < b ? a : b) * 0.998;
     final maxY =
         spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.002;
+    final lineColor =
+        asset.isUp ? AppColors.successGreen : AppColors.dangerRed;
 
     return SizedBox(
-      height: 180,
+      height: 160,
       child: LineChart(
         LineChartData(
           gridData: const FlGridData(show: false),
@@ -380,7 +553,7 @@ class _PriceChart extends StatelessWidget {
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              color: asset.isUp ? AppColors.successGreen : AppColors.dangerRed,
+              color: lineColor,
               barWidth: 2,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
@@ -390,10 +563,8 @@ class _PriceChart extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    (asset.isUp ? AppColors.successGreen : AppColors.dangerRed)
-                        .withValues(alpha: 0.2),
-                    (asset.isUp ? AppColors.successGreen : AppColors.dangerRed)
-                        .withValues(alpha: 0.0),
+                    lineColor.withValues(alpha: 0.18),
+                    lineColor.withValues(alpha: 0.0),
                   ],
                 ),
               ),
@@ -401,12 +572,13 @@ class _PriceChart extends StatelessWidget {
           ],
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              getTooltipItems: (spots) => spots.map((s) {
-                return LineTooltipItem(
-                  AppFormatters.price(s.y),
-                  AppTextStyles.captionBold.copyWith(color: Colors.white),
-                );
-              }).toList(),
+              getTooltipItems: (spots) => spots
+                  .map((s) => LineTooltipItem(
+                        AppFormatters.price(s.y),
+                        AppTextStyles.captionBold
+                            .copyWith(color: Colors.white),
+                      ))
+                  .toList(),
             ),
           ),
         ),
@@ -415,16 +587,14 @@ class _PriceChart extends StatelessWidget {
   }
 }
 
+// ── Supporting widgets ─────────────────────────────────────────────────────────
 class _ToggleOption extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
 
-  const _ToggleOption({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+  const _ToggleOption(
+      {required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -442,9 +612,41 @@ class _ToggleOption extends StatelessWidget {
             child: Text(
               label,
               style: AppTextStyles.label.copyWith(
-                color: active ? Colors.white : AppColors.mediumGrey,
+                color: active ? Colors.white : const Color(0xFF444444),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _ModeChip(
+      {required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? AppColors.gold : AppColors.lightGrey,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.caption.copyWith(
+            color: active ? Colors.white : const Color(0xFF444444),
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -457,11 +659,8 @@ class _SummaryRow extends StatelessWidget {
   final String value;
   final bool bold;
 
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    this.bold = false,
-  });
+  const _SummaryRow(
+      {required this.label, required this.value, this.bold = false});
 
   @override
   Widget build(BuildContext context) {
@@ -469,10 +668,13 @@ class _SummaryRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: bold ? AppTextStyles.label : AppTextStyles.bodyMedium),
+            style: bold
+                ? AppTextStyles.label
+                : AppTextStyles.bodyMedium),
         Text(value,
             style: bold
-                ? AppTextStyles.label.copyWith(color: AppColors.nearBlack)
+                ? AppTextStyles.label
+                    .copyWith(color: AppColors.nearBlack)
                 : AppTextStyles.bodyMedium),
       ],
     );

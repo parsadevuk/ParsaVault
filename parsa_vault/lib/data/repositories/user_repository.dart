@@ -127,4 +127,17 @@ class UserRepository {
       whereArgs: [userId],
     );
   }
+
+  Future<void> updateWebsite(String userId, String? website) async {
+    final db = await _db.database;
+    await db.update(
+      'users',
+      {
+        'website': website?.trim().isNotEmpty == true ? website!.trim() : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
 }

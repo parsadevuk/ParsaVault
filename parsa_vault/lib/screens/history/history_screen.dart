@@ -25,6 +25,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         return txs.where((t) => t.isBuy).toList();
       case 'Sells':
         return txs.where((t) => t.isSell).toList();
+      case 'Deposits':
+        return txs.where((t) => t.isDeposit).toList();
+      case 'Withdrawals':
+        return txs.where((t) => t.isWithdraw).toList();
       default:
         return txs;
     }
@@ -55,33 +59,38 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Text('Transaction History', style: AppTextStyles.screenTitle),
             ),
 
-            // Filter pills
+            // Filter pills — scrollable so all 5 fit on any screen width
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child: Row(
-                children: ['All', 'Buys', 'Sells'].map((label) {
-                  final active = _filter == label;
-                  return GestureDetector(
-                    onTap: () => setState(() => _filter = label),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: active ? AppColors.gold : AppColors.lightGrey,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        label,
-                        style: AppTextStyles.caption.copyWith(
-                          color: active ? Colors.white : AppColors.mediumGrey,
-                          fontWeight: FontWeight.w600,
+              padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: ['All', 'Buys', 'Sells', 'Deposits', 'Withdrawals']
+                      .map((label) {
+                    final active = _filter == label;
+                    return GestureDetector(
+                      onTap: () => setState(() => _filter = label),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: active ? AppColors.gold : AppColors.lightGrey,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          label,
+                          style: AppTextStyles.caption.copyWith(
+                            color: active ? Colors.white : const Color(0xFF555555),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
 

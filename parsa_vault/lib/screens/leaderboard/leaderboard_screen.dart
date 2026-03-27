@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -105,9 +106,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     super.dispose();
   }
 
-  List<_LeaderboardEntry> _buildEntries(String period) {
-    final user = ref.read(authProvider).user;
-    if (user == null) return [];
+  List<_LeaderboardEntry> _buildEntries(String period, User user) {
 
     // Get user XP for period
     int userXp;
@@ -150,6 +149,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
   @override
   Widget build(BuildContext context) {
     final hasNav = Navigator.of(context).canPop();
+    // ref.watch ensures the leaderboard rebuilds whenever XP changes
+    final user = ref.watch(authProvider).user;
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -189,14 +190,16 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
             ),
 
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _LeaderboardList(entries: _buildEntries('alltime')),
-                  _LeaderboardList(entries: _buildEntries('weekly')),
-                  _LeaderboardList(entries: _buildEntries('daily')),
-                ],
-              ),
+              child: user == null
+                  ? const SizedBox.shrink()
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _LeaderboardList(entries: _buildEntries('alltime', user)),
+                        _LeaderboardList(entries: _buildEntries('weekly', user)),
+                        _LeaderboardList(entries: _buildEntries('daily', user)),
+                      ],
+                    ),
             ),
           ],
         ),

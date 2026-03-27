@@ -208,8 +208,11 @@ class PortfolioService {
       );
     }
 
-    const xpAwarded = AppConstants.xpDeposit;
-    final newXp = user.xp + xpAwarded;
+    // Deposit is penalised — XP floors at 0
+    const xpChange = AppConstants.xpDeposit; // -10
+    final actualXpLost = xpChange.abs().clamp(0, user.xp); // can't lose more than you have
+    final xpAwarded = -actualXpLost; // negative value stored in transaction
+    final newXp = (user.xp + xpChange).clamp(0, 999999);
     final newLevel = XpCalculator.getLevelFromXp(newXp);
 
     await _userRepo.updateFinancials(
@@ -228,7 +231,7 @@ class PortfolioService {
       timestamp: DateTime.now(),
     ));
 
-    return const TradeResult(success: true, xpAwarded: xpAwarded);
+    return TradeResult(success: true, xpAwarded: xpAwarded);
   }
 
   Future<TradeResult> withdraw({required User user, required double amount}) async {

@@ -113,6 +113,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: user);
   }
 
+  Future<void> updateProfilePicture(String? base64Image) async {
+    final userId = state.user?.id;
+    if (userId == null) return;
+    await _service.updateProfilePicture(userId, base64Image);
+    if (base64Image != null) {
+      state = state.copyWith(
+          user: state.user!.copyWith(profilePicture: base64Image));
+    } else {
+      state = state.copyWith(
+          user: state.user!.copyWith(clearProfilePicture: true));
+    }
+  }
+
+  Future<void> updateWebsite(String? website) async {
+    final userId = state.user?.id;
+    if (userId == null) return;
+    await _service.updateWebsite(userId, website);
+    state = state.copyWith(
+      user: state.user!.copyWith(
+        website: (website?.trim().isNotEmpty == true) ? website!.trim() : null,
+        clearWebsite: (website == null || website.trim().isEmpty),
+      ),
+    );
+  }
+
   void clearError() => state = state.copyWith(clearError: true);
 }
 

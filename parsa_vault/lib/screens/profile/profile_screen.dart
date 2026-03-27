@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/portfolio_provider.dart';
 import '../../theme/app_colors.dart';
@@ -27,6 +29,16 @@ class ProfileScreen extends ConsumerWidget {
 
     final totalValue = ref.read(portfolioProvider.notifier).getPortfolioValue();
 
+    // Decode profile picture if present
+    ImageProvider? avatarImage;
+    if (user.profilePicture != null && user.profilePicture!.isNotEmpty) {
+      try {
+        avatarImage = MemoryImage(base64Decode(user.profilePicture!));
+      } catch (_) {
+        avatarImage = null;
+      }
+    }
+
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
@@ -42,24 +54,61 @@ class ProfileScreen extends ConsumerWidget {
             Center(
               child: Column(
                 children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: AppColors.gold,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.gold.withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                  GestureDetector(
+                    onTap: () => _pickProfilePicture(context, ref),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 84,
+                          height: 84,
+                          decoration: BoxDecoration(
+                            color: AppColors.gold,
+                            shape: BoxShape.circle,
+                            image: avatarImage != null
+                                ? DecorationImage(
+                                    image: avatarImage,
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.gold.withValues(alpha: 0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: avatarImage == null
+                              ? Center(
+                                  child: Text(
+                                    user.initials,
+                                    style: AppTextStyles.priceLarge.copyWith(
+                                        color: Colors.white, fontSize: 28),
+                                  ),
+                                )
+                              : null,
+                        ),
+                        // Camera edit badge
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: AppColors.nearBlack,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.white, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                    child: Center(
-                      child: Text(user.initials,
-                          style: AppTextStyles.priceLarge
-                              .copyWith(color: Colors.white, fontSize: 28)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -75,8 +124,8 @@ class ProfileScreen extends ConsumerWidget {
                   if (user.website != null && user.website!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(user.website!,
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.gold)),
+                        style:
+                            AppTextStyles.caption.copyWith(color: AppColors.gold)),
                   ],
                   const SizedBox(height: 12),
                   LevelBadge(level: user.level),
@@ -113,6 +162,12 @@ class ProfileScreen extends ConsumerWidget {
             // Action buttons
             Text('Account', style: AppTextStyles.sectionHeading),
             const SizedBox(height: 16),
+            GoldOutlineButton(
+              label: 'Change Photo',
+              icon: Icons.photo_camera_outlined,
+              onPressed: () => _pickProfilePicture(context, ref),
+            ),
+            const SizedBox(height: 12),
             GoldOutlineButton(
               label: 'Deposit Cash',
               icon: Icons.add_rounded,
@@ -176,6 +231,96 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _pickProfilePicture(BuildContext context, WidgetRef ref) async {
+    final choice = await showModalBottomSheet<_PhotoAction>(
+      context: context,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.borderGrey,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined,
+                    color: AppColors.nearBlack),
+                title: Text('Choose from Library', style: AppTextStyles.label),
+                onTap: () =>
+                    Navigator.of(sheetCtx).pop(_PhotoAction.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined,
+                    color: AppColors.nearBlack),
+                title: Text('Take a Photo', style: AppTextStyles.label),
+                onTap: () =>
+                    Navigator.of(sheetCtx).pop(_PhotoAction.camera),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.delete_outline,
+                    color: AppColors.dangerRed),
+                title: Text('Remove Photo',
+                    style: AppTextStyles.label
+                        .copyWith(color: AppColors.dangerRed)),
+                onTap: () =>
+                    Navigator.of(sheetCtx).pop(_PhotoAction.remove),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (choice == null || !context.mounted) return;
+
+    if (choice == _PhotoAction.remove) {
+      await ref.read(authProvider.notifier).updateProfilePicture(null);
+      return;
+    }
+
+    try {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickImage(
+        source: choice == _PhotoAction.gallery
+            ? ImageSource.gallery
+            : ImageSource.camera,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+
+      final bytes = await file.readAsBytes();
+      final base64Str = base64Encode(bytes);
+
+      await ref.read(authProvider.notifier).updateProfilePicture(base64Str);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not load photo. Please try again.'),
+            backgroundColor: AppColors.dangerRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
     final confirmed = await showConfirmationDialog(
       context: context,
@@ -197,7 +342,8 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showConfirmationDialog(
       context: context,
       title: 'Reset your portfolio?',
-      body: 'This clears all your holdings and sets your cash back to \$10,000. Your XP and level stay.',
+      body:
+          'This clears all your holdings and sets your cash back to \$10,000. Your XP and level stay.',
       confirmLabel: 'Reset Portfolio',
     );
     if (!confirmed || !context.mounted) return;
@@ -219,7 +365,8 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showConfirmationDialog(
       context: context,
       title: 'Reset everything?',
-      body: 'This wipes your XP, level, holdings, and cash. You\'ll start from zero. This can\'t be undone.',
+      body:
+          'This wipes your XP, level, holdings, and cash. You\'ll start from zero. This can\'t be undone.',
       confirmLabel: 'Reset Everything',
     );
     if (!confirmed || !context.mounted) return;
@@ -262,6 +409,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 }
+
+enum _PhotoAction { gallery, camera, remove }
 
 class _StatCard extends StatelessWidget {
   final String label;
@@ -444,7 +593,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     final userId = widget.ref.read(authProvider).user?.id;
     if (userId == null) return;
 
-    // Password change via AuthService (full implementation in next iteration)
     setState(() => _loading = false);
     if (mounted) {
       Navigator.of(context).pop();

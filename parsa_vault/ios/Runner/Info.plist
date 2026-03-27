@@ -64,5 +64,11 @@
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Parsa Vault needs access to your photo library to let you set a profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Parsa Vault needs access to your camera to let you take a profile picture.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

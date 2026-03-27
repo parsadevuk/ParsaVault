@@ -125,6 +125,15 @@ class AuthService {
     return user!;
   }
 
+  Future<void> updateProfilePicture(
+      String userId, String? base64Image) async {
+    await _userRepo.updateProfilePicture(userId, base64Image);
+  }
+
+  Future<void> updateWebsite(String userId, String? website) async {
+    await _userRepo.updateWebsite(userId, website);
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
   Future<void> _createSession(String userId) async {
     await _sessionRepo.createSession(

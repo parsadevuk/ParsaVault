@@ -8,7 +8,6 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/xp_progress_bar.dart';
-import '../../widgets/common/asset_tile.dart';
 import '../../widgets/common/empty_state.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../trade/trade_screen.dart';
@@ -24,8 +23,10 @@ class HomeScreen extends ConsumerWidget {
 
     if (user == null) return const SizedBox.shrink();
 
-    final totalValue = ref.read(portfolioProvider.notifier).getPortfolioValue();
-    final holdingsValue = ref.read(portfolioProvider.notifier).getHoldingsValue();
+    final totalValue =
+        ref.read(portfolioProvider.notifier).getPortfolioValue();
+    final holdingsValue =
+        ref.read(portfolioProvider.notifier).getHoldingsValue();
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -51,7 +52,8 @@ class HomeScreen extends ConsumerWidget {
                         children: [
                           Text('${AppFormatters.greeting()},',
                               style: AppTextStyles.caption),
-                          Text(user.firstName, style: AppTextStyles.greetingText),
+                          Text(user.firstName,
+                              style: AppTextStyles.greetingText),
                         ],
                       ),
                       GestureDetector(
@@ -61,7 +63,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                         child: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: AppColors.goldLight,
                             shape: BoxShape.circle,
                           ),
@@ -113,11 +115,12 @@ class HomeScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
-                child: Text('My Holdings', style: AppTextStyles.sectionHeading),
+                child:
+                    Text('My Holdings', style: AppTextStyles.sectionHeading),
               ),
             ),
 
-            // Holdings list or empty
+            // Holdings list or empty state
             if (portfolio.holdings.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -138,37 +141,126 @@ class HomeScreen extends ConsumerWidget {
                     final h = portfolio.holdings[i];
                     final asset = market.findBySymbol(h.symbol);
                     if (asset == null) return const SizedBox.shrink();
+
                     final currentValue = h.shares * asset.currentPrice;
-                    final pnl = currentValue - (h.shares * h.averageBuyPrice);
+
+                    // P&L = (currentPrice - avgBuyPrice) / avgBuyPrice * 100
+                    // This reflects the user's actual profit/loss on their position,
+                    // not the 24hr market change.
+                    final pnlAmount =
+                        (asset.currentPrice - h.averageBuyPrice) * h.shares;
+                    final pnlPercent =
+                        ((asset.currentPrice - h.averageBuyPrice) /
+                                h.averageBuyPrice) *
+                            100;
+                    final isProfitable = pnlAmount >= 0;
+
                     return Column(
                       children: [
-                        AssetTile(
-                          asset: asset,
-                          sharesOwned: h.shares,
+                        InkWell(
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => TradeScreen(asset: asset),
-                            ),
+                                builder: (_) =>
+                                    TradeScreen(asset: asset)),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(
-                              left: 80, right: 24, bottom: 6),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                  'Value: ${AppFormatters.currency(currentValue)}',
-                                  style: AppTextStyles.caption),
-                              Text(
-                                '${pnl >= 0 ? '+' : ''}${AppFormatters.currency(pnl)}',
-                                style: AppTextStyles.caption.copyWith(
-                                  color: pnl >= 0
-                                      ? AppColors.successGreen
-                                      : AppColors.dangerRed,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
+                            child: Row(
+                              children: [
+                                // Asset icon
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: asset.isStock
+                                        ? AppColors.lightGrey
+                                        : AppColors.goldLight,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      asset.isStock
+                                          ? Icons.show_chart
+                                          : Icons.currency_bitcoin,
+                                      size: 22,
+                                      color: asset.isStock
+                                          ? AppColors.nearBlack
+                                          : AppColors.gold,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 12),
+                                // Name + shares
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(h.symbol,
+                                          style: AppTextStyles.label),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${AppFormatters.shares(h.shares)} shares',
+                                        style: AppTextStyles.caption,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Avg ${AppFormatters.price(h.averageBuyPrice)}',
+                                        style: AppTextStyles.caption
+                                            .copyWith(fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Value + P&L %
+                                Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                        AppFormatters.currency(currentValue),
+                                        style: AppTextStyles.priceSmall),
+                                    const SizedBox(height: 3),
+                                    // P&L percentage (profit/loss on position)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isProfitable
+                                            ? AppColors.successGreen
+                                                .withValues(alpha: 0.1)
+                                            : AppColors.dangerRed
+                                                .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        '${isProfitable ? '+' : ''}${pnlPercent.toStringAsFixed(2)}%',
+                                        style: AppTextStyles.caption
+                                            .copyWith(
+                                          color: isProfitable
+                                              ? AppColors.successGreen
+                                              : AppColors.dangerRed,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${isProfitable ? '+' : ''}${AppFormatters.currency(pnlAmount)}',
+                                      style: AppTextStyles.caption
+                                          .copyWith(
+                                        color: isProfitable
+                                            ? AppColors.successGreen
+                                            : AppColors.dangerRed,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         const Divider(height: 1, indent: 80),
@@ -205,8 +297,7 @@ class _PortfolioCard extends StatelessWidget {
         color: AppColors.softWhite,
         borderRadius: BorderRadius.circular(12),
         border: const Border(
-          left: BorderSide(color: AppColors.gold, width: 4),
-        ),
+            left: BorderSide(color: AppColors.gold, width: 4)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -220,25 +311,23 @@ class _PortfolioCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Total Portfolio Value',
-              style: AppTextStyles.caption.copyWith(letterSpacing: 0.5)),
+              style: AppTextStyles.caption
+                  .copyWith(letterSpacing: 0.5)),
           const SizedBox(height: 6),
-          Text(AppFormatters.currency(totalValue), style: AppTextStyles.priceLarge),
+          Text(AppFormatters.currency(totalValue),
+              style: AppTextStyles.priceLarge),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: _MiniCard(
-                  label: 'Cash',
-                  value: AppFormatters.currency(cashBalance),
-                ),
-              ),
+                  child: _MiniCard(
+                      label: 'Cash',
+                      value: AppFormatters.currency(cashBalance))),
               const SizedBox(width: 12),
               Expanded(
-                child: _MiniCard(
-                  label: 'Holdings',
-                  value: AppFormatters.currency(holdingsValue),
-                ),
-              ),
+                  child: _MiniCard(
+                      label: 'Holdings',
+                      value: AppFormatters.currency(holdingsValue))),
             ],
           ),
         ],
