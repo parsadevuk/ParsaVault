@@ -7,68 +7,6 @@ import '../../theme/app_text_styles.dart';
 import '../../utils/xp_calculator.dart';
 import '../../widgets/common/level_badge.dart';
 
-// Mock ghost users for a more fun leaderboard
-class _GhostUser {
-  final String username;
-  final String initials;
-  final int allTimeXp;
-  final int weeklyXp;
-  final int dailyXp;
-
-  const _GhostUser({
-    required this.username,
-    required this.initials,
-    required this.allTimeXp,
-    required this.weeklyXp,
-    required this.dailyXp,
-  });
-}
-
-final _ghosts = [
-  const _GhostUser(
-      username: 'TradingWolf',
-      initials: 'TW',
-      allTimeXp: 2840,
-      weeklyXp: 180,
-      dailyXp: 35),
-  const _GhostUser(
-      username: 'BullRunner',
-      initials: 'BR',
-      allTimeXp: 1650,
-      weeklyXp: 210,
-      dailyXp: 50),
-  const _GhostUser(
-      username: 'CryptoKing',
-      initials: 'CK',
-      allTimeXp: 980,
-      weeklyXp: 95,
-      dailyXp: 20),
-  const _GhostUser(
-      username: 'StockStar',
-      initials: 'SS',
-      allTimeXp: 3200,
-      weeklyXp: 120,
-      dailyXp: 15),
-  const _GhostUser(
-      username: 'VaultPro',
-      initials: 'VP',
-      allTimeXp: 540,
-      weeklyXp: 310,
-      dailyXp: 60),
-  const _GhostUser(
-      username: 'GoldTrader',
-      initials: 'GT',
-      allTimeXp: 4100,
-      weeklyXp: 85,
-      dailyXp: 10),
-  const _GhostUser(
-      username: 'MarketMaven',
-      initials: 'MM',
-      allTimeXp: 720,
-      weeklyXp: 145,
-      dailyXp: 25),
-];
-
 class _LeaderboardEntry {
   final String username;
   final String initials;
@@ -106,50 +44,52 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     super.dispose();
   }
 
+  /// Start of the current UTC day.
+  DateTime get _todayUtc {
+    final now = DateTime.now().toUtc();
+    return DateTime.utc(now.year, now.month, now.day);
+  }
+
+  /// Start of the current UTC week (Monday 00:00 UTC = Greenwich).
+  DateTime get _weekStartUtc {
+    final today = _todayUtc;
+    // weekday: 1=Mon … 7=Sun
+    final daysFromMonday = today.weekday - 1;
+    return today.subtract(Duration(days: daysFromMonday));
+  }
+
   List<_LeaderboardEntry> _buildEntries(String period, User user) {
+    // All Time: use full XP
+    // This Week / Today: Phase 2 (Firestore) will track per-period XP.
+    // For now show total XP in all tabs — real period tracking coming soon.
+    final xp = user.xp;
 
-    // Get user XP for period
-    int userXp;
-    switch (period) {
-      case 'weekly':
-        // Simple: use a fraction of total XP for weekly display in MVP
-        userXp = (user.xp * 0.3).round();
-        break;
-      case 'daily':
-        userXp = (user.xp * 0.05).round();
-        break;
-      default:
-        userXp = user.xp;
-    }
-
-    // Build ghost entries for period
-    final entries = <_LeaderboardEntry>[
+    return [
       _LeaderboardEntry(
         username: user.username,
         initials: user.initials,
-        xp: userXp,
+        xp: xp,
         isCurrentUser: true,
       ),
-      ..._ghosts.map((g) => _LeaderboardEntry(
-            username: g.username,
-            initials: g.initials,
-            xp: period == 'weekly'
-                ? g.weeklyXp
-                : period == 'daily'
-                    ? g.dailyXp
-                    : g.allTimeXp,
-            isCurrentUser: false,
-          )),
     ];
+  }
 
-    entries.sort((a, b) => b.xp.compareTo(a.xp));
-    return entries;
+  String _periodLabel(String period) {
+    if (period == 'weekly') {
+      final start = _weekStartUtc;
+      return 'Week of ${start.day}/${start.month} (UTC)';
+    }
+    if (period == 'daily') {
+      final now = _todayUtc;
+      return '${now.day}/${now.month}/${now.year} (UTC)';
+    }
+    return 'All Time';
   }
 
   @override
   Widget build(BuildContext context) {
     final hasNav = Navigator.of(context).canPop();
-    // ref.watch ensures the leaderboard rebuilds whenever XP changes
+    // ref.watch so leaderboard rebuilds immediately when XP changes
     final user = ref.watch(authProvider).user;
 
     return Scaffold(
@@ -195,9 +135,18 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                   : TabBarView(
                       controller: _tabController,
                       children: [
-                        _LeaderboardList(entries: _buildEntries('alltime', user)),
-                        _LeaderboardList(entries: _buildEntries('weekly', user)),
-                        _LeaderboardList(entries: _buildEntries('daily', user)),
+                        _LeaderboardList(
+                          entries: _buildEntries('alltime', user),
+                          periodLabel: _periodLabel('alltime'),
+                        ),
+                        _LeaderboardList(
+                          entries: _buildEntries('weekly', user),
+                          periodLabel: _periodLabel('weekly'),
+                        ),
+                        _LeaderboardList(
+                          entries: _buildEntries('daily', user),
+                          periodLabel: _periodLabel('daily'),
+                        ),
                       ],
                     ),
             ),
@@ -210,36 +159,57 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
 
 class _LeaderboardList extends StatelessWidget {
   final List<_LeaderboardEntry> entries;
+  final String periodLabel;
 
-  const _LeaderboardList({required this.entries});
+  const _LeaderboardList({
+    required this.entries,
+    required this.periodLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.emoji_events_outlined,
-                size: 48, color: AppColors.borderGrey),
-            const SizedBox(height: 12),
-            Text('Nothing yet.',
-                style: AppTextStyles.sectionHeading
-                    .copyWith(color: AppColors.mediumGrey)),
-            const SizedBox(height: 8),
-            Text('Make a trade to show up on the board.',
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.mediumGrey)),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.only(top: 12, bottom: 24),
-      itemCount: entries.length,
-      itemBuilder: (_, i) =>
-          _EntryRow(rank: i + 1, entry: entries[i]),
+      children: [
+        // Period label
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+          child: Text(
+            periodLabel,
+            style: AppTextStyles.caption.copyWith(color: AppColors.mediumGrey),
+          ),
+        ),
+
+        // Real user entries
+        ...entries.map((e) => _EntryRow(rank: 1, entry: e)),
+
+        // Coming soon notice
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.cloud_outlined,
+                    size: 20, color: AppColors.mediumGrey),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Full leaderboard with all players launches with cloud sync in the next update.',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.mediumGrey),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -250,13 +220,6 @@ class _EntryRow extends StatelessWidget {
 
   const _EntryRow({required this.rank, required this.entry});
 
-  Color get _rankColor {
-    if (rank == 1) return const Color(0xFFD4A843);
-    if (rank == 2) return const Color(0xFF9E9E9E);
-    if (rank == 3) return const Color(0xFFCD7F32);
-    return AppColors.mediumGrey;
-  }
-
   @override
   Widget build(BuildContext context) {
     final level = XpCalculator.getLevelFromXp(entry.xp);
@@ -265,9 +228,7 @@ class _EntryRow extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 3),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: entry.isCurrentUser
-            ? AppColors.goldLight
-            : AppColors.white,
+        color: entry.isCurrentUser ? AppColors.goldLight : AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: entry.isCurrentUser
             ? Border.all(color: AppColors.gold.withValues(alpha: 0.4), width: 1)
@@ -279,10 +240,11 @@ class _EntryRow extends StatelessWidget {
           SizedBox(
             width: 32,
             child: Text(
-              rank <= 3 ? _medal(rank) : '#$rank',
-              style: rank <= 3
+              rank == 1 ? '🥇' : '#$rank',
+              style: rank == 1
                   ? const TextStyle(fontSize: 20)
-                  : AppTextStyles.label.copyWith(color: _rankColor),
+                  : AppTextStyles.label
+                      .copyWith(color: AppColors.mediumGrey),
               textAlign: TextAlign.center,
             ),
           ),
@@ -292,8 +254,8 @@ class _EntryRow extends StatelessWidget {
           Container(
             width: 38,
             height: 38,
-            decoration: BoxDecoration(
-              color: entry.isCurrentUser ? AppColors.gold : AppColors.lightGrey,
+            decoration: const BoxDecoration(
+              color: AppColors.gold,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -301,8 +263,7 @@ class _EntryRow extends StatelessWidget {
                 entry.initials,
                 style: AppTextStyles.caption.copyWith(
                   fontWeight: FontWeight.bold,
-                  color:
-                      entry.isCurrentUser ? Colors.white : AppColors.nearBlack,
+                  color: Colors.white,
                   fontSize: 13,
                 ),
               ),
@@ -318,20 +279,18 @@ class _EntryRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(entry.username, style: AppTextStyles.label),
-                    if (entry.isCurrentUser) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.gold,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text('You',
-                            style: AppTextStyles.badgeText.copyWith(
-                                fontSize: 9)),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                    ],
+                      child: Text('You',
+                          style: AppTextStyles.badgeText
+                              .copyWith(fontSize: 9)),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 2),
@@ -345,17 +304,11 @@ class _EntryRow extends StatelessWidget {
             '${entry.xp} XP',
             style: AppTextStyles.priceSmall.copyWith(
               fontSize: 14,
-              color: entry.isCurrentUser ? AppColors.gold : AppColors.nearBlack,
+              color: AppColors.gold,
             ),
           ),
         ],
       ),
     );
-  }
-
-  String _medal(int rank) {
-    if (rank == 1) return '🥇';
-    if (rank == 2) return '🥈';
-    return '🥉';
   }
 }

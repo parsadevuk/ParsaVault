@@ -8,7 +8,6 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/formatters.dart';
 import '../../utils/validators.dart';
-import '../../widgets/buttons/gold_outline_button.dart';
 import '../../widgets/buttons/destructive_button.dart';
 import '../../widgets/common/xp_progress_bar.dart';
 import '../../widgets/common/level_badge.dart';
@@ -162,28 +161,70 @@ class ProfileScreen extends ConsumerWidget {
             // Action buttons
             Text('Account', style: AppTextStyles.sectionHeading),
             const SizedBox(height: 16),
-            GoldOutlineButton(
+            _NeutralOutlineButton(
               label: 'Change Photo',
               icon: Icons.photo_camera_outlined,
               onPressed: () => _pickProfilePicture(context, ref),
             ),
             const SizedBox(height: 12),
-            GoldOutlineButton(
-              label: 'Deposit Cash',
-              icon: Icons.add_rounded,
-              onPressed: () => _showCashSheet(context, ref, isDeposit: true),
+            _NeutralOutlineButton(
+              label: 'Edit Website',
+              icon: Icons.language_outlined,
+              onPressed: () => _showEditWebsiteSheet(context, ref),
             ),
             const SizedBox(height: 12),
-            GoldOutlineButton(
-              label: 'Withdraw Cash',
-              icon: Icons.remove_rounded,
-              onPressed: () => _showCashSheet(context, ref, isDeposit: false),
-            ),
-            const SizedBox(height: 12),
-            GoldOutlineButton(
+            _NeutralOutlineButton(
               label: 'Change Password',
               icon: Icons.lock_outline_rounded,
               onPressed: () => _showChangePasswordSheet(context, ref),
+            ),
+            const SizedBox(height: 20),
+
+            // Cash actions — colour-coded by XP effect
+            Row(
+              children: [
+                Expanded(
+                  child: _ColoredOutlineButton(
+                    label: 'Deposit',
+                    icon: Icons.add_rounded,
+                    color: AppColors.dangerRed,
+                    onPressed: () =>
+                        _showCashSheet(context, ref, isDeposit: true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ColoredOutlineButton(
+                    label: 'Withdraw',
+                    icon: Icons.arrow_upward_rounded,
+                    color: AppColors.successGreen,
+                    onPressed: () =>
+                        _showCashSheet(context, ref, isDeposit: false),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '−10 XP penalty',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.dangerRed, fontSize: 11),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '+10 XP reward',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.successGreen, fontSize: 11),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 28),
 
@@ -211,17 +252,27 @@ class ProfileScreen extends ConsumerWidget {
               'Resets everything. XP, level, balance. Fresh start.',
               style: AppTextStyles.caption,
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 32),
 
-            // Logout
+            // Logout — prominent but calm
             SizedBox(
               width: double.infinity,
-              height: 48,
-              child: TextButton(
+              height: 52,
+              child: OutlinedButton.icon(
                 onPressed: () => _logout(context, ref),
-                child: Text('Log Out',
-                    style: AppTextStyles.label
-                        .copyWith(color: AppColors.mediumGrey)),
+                icon: const Icon(Icons.logout_rounded,
+                    size: 18, color: AppColors.dangerRed),
+                label: Text(
+                  'Log Out',
+                  style: AppTextStyles.buttonText
+                      .copyWith(color: AppColors.dangerRed),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                      color: AppColors.dangerRed, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -406,6 +457,18 @@ class ProfileScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _ChangePasswordSheet(ref: ref),
+    );
+  }
+
+  void _showEditWebsiteSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _EditWebsiteSheet(ref: ref),
     );
   }
 }
@@ -663,6 +726,177 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
               isLoading: _loading,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Edit Website Sheet ─────────────────────────────────────────────────────────
+class _EditWebsiteSheet extends StatefulWidget {
+  final WidgetRef ref;
+  const _EditWebsiteSheet({required this.ref});
+
+  @override
+  State<_EditWebsiteSheet> createState() => _EditWebsiteSheetState();
+}
+
+class _EditWebsiteSheetState extends State<_EditWebsiteSheet> {
+  late final TextEditingController _ctrl;
+  final _formKey = GlobalKey<FormState>();
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final current = widget.ref.read(authProvider).user?.website ?? '';
+    _ctrl = TextEditingController(text: current);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String? _validateUrl(String? v) {
+    if (v == null || v.trim().isEmpty) return null; // blank is allowed — clears it
+    final trimmed = v.trim();
+    if (!trimmed.contains('.')) return 'Enter a valid website URL.';
+    return null;
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _loading = true);
+    final value = _ctrl.text.trim().isEmpty ? null : _ctrl.text.trim();
+    await widget.ref.read(authProvider.notifier).updateWebsite(value);
+    if (mounted) {
+      setState(() => _loading = false);
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(value != null ? 'Website updated.' : 'Website removed.'),
+          backgroundColor: AppColors.nearBlack,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Edit Website', style: AppTextStyles.sectionHeading),
+            const SizedBox(height: 4),
+            Text(
+              'Leave blank to remove it from your profile.',
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: AppColors.mediumGrey),
+            ),
+            const SizedBox(height: 20),
+            GoldInputField(
+              label: 'Website URL',
+              hint: 'https://yoursite.com',
+              controller: _ctrl,
+              validator: _validateUrl,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              onEditingComplete: _submit,
+            ),
+            const SizedBox(height: 20),
+            GoldButton(
+              label: 'Save',
+              onPressed: _submit,
+              isLoading: _loading,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Neutral charcoal outline button (account actions) ─────────────────────────
+class _NeutralOutlineButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _NeutralOutlineButton({
+    required this.label,
+    required this.icon,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18, color: AppColors.nearBlack),
+        label: Text(
+          label,
+          style: AppTextStyles.buttonText.copyWith(color: AppColors.nearBlack),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Color(0xFF2C2C2C), width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Coloured outline button (deposit = red, withdraw = green) ─────────────────
+class _ColoredOutlineButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onPressed;
+
+  const _ColoredOutlineButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18, color: color),
+        label: Text(
+          label,
+          style: AppTextStyles.buttonText.copyWith(color: color),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: color, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );

@@ -50,12 +50,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           website: _websiteCtrl.text.isEmpty ? null : _websiteCtrl.text,
           password: _passCtrl.text,
         );
-    if (success && mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-        (_) => false,
-      );
-    }
+    if (success && mounted) _goHome();
+  }
+
+  Future<void> _ssoSignIn(Future<bool> Function() ssoCall) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final success = await ssoCall();
+    if (success && mounted) _goHome();
+  }
+
+  void _goHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainNavigation()),
+      (_) => false,
+    );
   }
 
   Color get _strengthColor {
@@ -275,9 +283,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   // SSO divider + buttons
                   const SsoDivider(),
-                  AppleSignInButton(onPressed: null),
+                  AppleSignInButton(
+                    onPressed: () => _ssoSignIn(
+                        () => ref.read(authProvider.notifier).signInWithApple()),
+                  ),
                   const SizedBox(height: 12),
-                  GoogleSignInButton(onPressed: null),
+                  GoogleSignInButton(
+                    onPressed: () => _ssoSignIn(
+                        () => ref.read(authProvider.notifier).signInWithGoogle()),
+                  ),
+                  const SizedBox(height: 12),
+                  MicrosoftSignInButton(
+                    onPressed: () => _ssoSignIn(
+                        () => ref.read(authProvider.notifier).signInWithMicrosoft()),
+                  ),
                   const SizedBox(height: 40),
                 ],
               ),

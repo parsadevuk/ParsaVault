@@ -10,12 +10,14 @@ class AuthState {
   final User? user;
   final String? error;
   final bool isLoading;
+  final bool emailVerified;
 
   const AuthState({
     this.status = AuthStatus.checking,
     this.user,
     this.error,
     this.isLoading = false,
+    this.emailVerified = false,
   });
 
   AuthState copyWith({
@@ -23,6 +25,7 @@ class AuthState {
     User? user,
     String? error,
     bool? isLoading,
+    bool? emailVerified,
     bool clearError = false,
     bool clearUser = false,
   }) {
@@ -31,6 +34,7 @@ class AuthState {
       user: clearUser ? null : (user ?? this.user),
       error: clearError ? null : (error ?? this.error),
       isLoading: isLoading ?? this.isLoading,
+      emailVerified: emailVerified ?? this.emailVerified,
     );
   }
 
@@ -50,7 +54,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final user = await _service.getSessionUser();
       if (user != null) {
-        state = AuthState(status: AuthStatus.authenticated, user: user);
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          user: user,
+          emailVerified: _service.isEmailVerified,
+        );
         return;
       }
       final hasUsers = await _service.anyUsersExist();
@@ -62,6 +70,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  // ── Email + Password ────────────────────────────────────────────────────────
+
   Future<bool> login({
     required String emailOrUsername,
     required String password,
@@ -72,7 +82,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       password: password,
     );
     if (result.success) {
-      state = AuthState(status: AuthStatus.authenticated, user: result.user);
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        emailVerified: _service.isEmailVerified,
+      );
       return true;
     }
     state = state.copyWith(isLoading: false, error: result.error);
@@ -95,7 +109,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       password: password,
     );
     if (result.success) {
-      state = AuthState(status: AuthStatus.authenticated, user: result.user);
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        emailVerified: false, // New email/password users always start unverified
+      );
       return true;
     }
     state = state.copyWith(isLoading: false, error: result.error);
@@ -104,8 +122,81 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _service.logout();
-    state = const AuthState(status: AuthStatus.unauthenticated);
+    final hasUsers = await _service.anyUsersExist();
+    state = AuthState(
+      status: hasUsers ? AuthStatus.unauthenticated : AuthStatus.noUsers,
+    );
   }
+
+  // ── SSO ─────────────────────────────────────────────────────────────────────
+
+  Future<bool> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result = await _service.signInWithGoogle();
+    if (result.success) {
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        emailVerified: true, // Google always verifies email
+      );
+      return true;
+    }
+    // null error = user cancelled — don't show an error message
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error,
+    );
+    return false;
+  }
+
+  Future<bool> signInWithApple() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result = await _service.signInWithApple();
+    if (result.success) {
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        emailVerified: true, // Apple always verifies email
+      );
+      return true;
+    }
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error,
+    );
+    return false;
+  }
+
+  Future<bool> signInWithMicrosoft() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result = await _service.signInWithMicrosoft();
+    if (result.success) {
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        emailVerified: true, // Microsoft always verifies email
+      );
+      return true;
+    }
+    state = state.copyWith(
+      isLoading: false,
+      error: result.error,
+    );
+    return false;
+  }
+
+  // ── Email Verification ──────────────────────────────────────────────────────
+
+  Future<void> sendVerificationEmail() async {
+    await _service.sendVerificationEmail();
+  }
+
+  Future<void> refreshEmailVerified() async {
+    final verified = await _service.refreshEmailVerified();
+    state = state.copyWith(emailVerified: verified);
+  }
+
+  // ── Profile ─────────────────────────────────────────────────────────────────
 
   Future<void> refreshUser() async {
     if (state.user == null) return;

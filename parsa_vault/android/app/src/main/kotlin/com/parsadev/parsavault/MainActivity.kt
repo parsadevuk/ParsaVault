@@ -1,4 +1,4 @@
-package com.parsadev.parsa_vault
+package com.parsadev.parsavault
 
 import io.flutter.embedding.android.FlutterActivity
 
