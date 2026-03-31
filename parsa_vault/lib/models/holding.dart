@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Holding {
   final String id;
   final String userId;
@@ -41,31 +43,37 @@ class Holding {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  // ── Firestore ──────────────────────────────────────────────────────────────
+  // Document ID in Firestore is the symbol; userId is implied by the collection path.
+
+  Map<String, dynamic> toFirestore() {
     return {
       'id': id,
-      'user_id': userId,
       'symbol': symbol,
-      'asset_name': assetName,
-      'asset_type': assetType,
+      'assetName': assetName,
+      'assetType': assetType,
       'shares': shares,
-      'average_buy_price': averageBuyPrice,
-      'last_updated_at': lastUpdatedAt.toIso8601String(),
+      'averageBuyPrice': averageBuyPrice,
+      'lastUpdatedAt': Timestamp.fromDate(lastUpdatedAt),
     };
   }
 
-  factory Holding.fromMap(Map<String, dynamic> map) {
+  factory Holding.fromFirestore(DocumentSnapshot doc, String userId) {
+    final data = doc.data() as Map<String, dynamic>;
     return Holding(
-      id: map['id'] as String,
-      userId: map['user_id'] as String,
-      symbol: map['symbol'] as String,
-      assetName: map['asset_name'] as String,
-      assetType: map['asset_type'] as String,
-      shares: (map['shares'] as num).toDouble(),
-      averageBuyPrice: (map['average_buy_price'] as num).toDouble(),
-      lastUpdatedAt: DateTime.parse(map['last_updated_at'] as String),
+      id: data['id'] as String? ?? doc.id,
+      userId: userId,
+      symbol: data['symbol'] as String? ?? doc.id,
+      assetName: data['assetName'] as String? ?? '',
+      assetType: data['assetType'] as String? ?? 'stock',
+      shares: (data['shares'] as num?)?.toDouble() ?? 0.0,
+      averageBuyPrice: (data['averageBuyPrice'] as num?)?.toDouble() ?? 0.0,
+      lastUpdatedAt: (data['lastUpdatedAt'] as Timestamp?)?.toDate() ??
+          DateTime.now().toUtc(),
     );
   }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   double get totalCost => shares * averageBuyPrice;
 

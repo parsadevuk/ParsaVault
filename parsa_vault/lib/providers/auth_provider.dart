@@ -11,6 +11,7 @@ class AuthState {
   final String? error;
   final bool isLoading;
   final bool emailVerified;
+  final bool isNewSsoUser;
 
   const AuthState({
     this.status = AuthStatus.checking,
@@ -18,6 +19,7 @@ class AuthState {
     this.error,
     this.isLoading = false,
     this.emailVerified = false,
+    this.isNewSsoUser = false,
   });
 
   AuthState copyWith({
@@ -26,6 +28,7 @@ class AuthState {
     String? error,
     bool? isLoading,
     bool? emailVerified,
+    bool? isNewSsoUser,
     bool clearError = false,
     bool clearUser = false,
   }) {
@@ -35,6 +38,7 @@ class AuthState {
       error: clearError ? null : (error ?? this.error),
       isLoading: isLoading ?? this.isLoading,
       emailVerified: emailVerified ?? this.emailVerified,
+      isNewSsoUser: isNewSsoUser ?? this.isNewSsoUser,
     );
   }
 
@@ -137,7 +141,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(
         status: AuthStatus.authenticated,
         user: result.user,
-        emailVerified: true, // Google always verifies email
+        emailVerified: true,
+        isNewSsoUser: result.isNewUser,
       );
       return true;
     }
@@ -156,7 +161,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(
         status: AuthStatus.authenticated,
         user: result.user,
-        emailVerified: true, // Apple always verifies email
+        emailVerified: true,
+        isNewSsoUser: result.isNewUser,
       );
       return true;
     }
@@ -174,7 +180,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(
         status: AuthStatus.authenticated,
         user: result.user,
-        emailVerified: true, // Microsoft always verifies email
+        emailVerified: true,
+        isNewSsoUser: result.isNewUser,
       );
       return true;
     }
@@ -182,6 +189,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isLoading: false,
       error: result.error,
     );
+    return false;
+  }
+
+  Future<bool> completeProfile({
+    required String username,
+    String? website,
+  }) async {
+    final userId = state.user?.id;
+    if (userId == null) return false;
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result = await _service.completeProfile(
+      userId: userId,
+      username: username,
+      website: website,
+    );
+    if (result.success) {
+      state = state.copyWith(
+        isLoading: false,
+        user: result.user,
+        isNewSsoUser: false,
+      );
+      return true;
+    }
+    state = state.copyWith(isLoading: false, error: result.error);
     return false;
   }
 

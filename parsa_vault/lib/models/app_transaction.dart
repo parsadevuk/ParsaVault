@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AppTransaction {
   final String id;
   final String userId;
@@ -27,43 +29,44 @@ class AppTransaction {
     required this.timestamp,
   });
 
-  Map<String, dynamic> toMap() {
+  // ── Firestore ──────────────────────────────────────────────────────────────
+
+  Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
-      'user_id': userId,
+      'userId': userId,
       'type': type,
       'symbol': symbol,
-      'asset_name': assetName,
-      'asset_type': assetType,
+      'assetName': assetName,
+      'assetType': assetType,
       'shares': shares,
-      'price_at_time': priceAtTime,
-      'total_amount': totalAmount,
-      'xp_awarded': xpAwarded,
-      'profit_or_loss': profitOrLoss,
-      'timestamp': timestamp.toIso8601String(),
+      'priceAtTime': priceAtTime,
+      'totalAmount': totalAmount,
+      'xpAwarded': xpAwarded,
+      'profitOrLoss': profitOrLoss,
+      'timestamp': Timestamp.fromDate(timestamp),
     };
   }
 
-  factory AppTransaction.fromMap(Map<String, dynamic> map) {
+  factory AppTransaction.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
     return AppTransaction(
-      id: map['id'] as String,
-      userId: map['user_id'] as String,
-      type: map['type'] as String,
-      symbol: map['symbol'] as String?,
-      assetName: map['asset_name'] as String?,
-      assetType: map['asset_type'] as String?,
-      shares: map['shares'] != null ? (map['shares'] as num).toDouble() : null,
-      priceAtTime: map['price_at_time'] != null
-          ? (map['price_at_time'] as num).toDouble()
-          : null,
-      totalAmount: (map['total_amount'] as num).toDouble(),
-      xpAwarded: map['xp_awarded'] as int,
-      profitOrLoss: map['profit_or_loss'] != null
-          ? (map['profit_or_loss'] as num).toDouble()
-          : null,
-      timestamp: DateTime.parse(map['timestamp'] as String),
+      id: doc.id,
+      userId: data['userId'] as String? ?? '',
+      type: data['type'] as String? ?? '',
+      symbol: data['symbol'] as String?,
+      assetName: data['assetName'] as String?,
+      assetType: data['assetType'] as String?,
+      shares: (data['shares'] as num?)?.toDouble(),
+      priceAtTime: (data['priceAtTime'] as num?)?.toDouble(),
+      totalAmount: (data['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      xpAwarded: (data['xpAwarded'] as num?)?.toInt() ?? 0,
+      profitOrLoss: (data['profitOrLoss'] as num?)?.toDouble(),
+      timestamp:
+          (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now().toUtc(),
     );
   }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   bool get isBuy => type == 'buy';
   bool get isSell => type == 'sell';

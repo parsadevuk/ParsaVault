@@ -12,7 +12,28 @@
           "package_name": "com.parsadev.parsavault"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "54301561490-00b18s95inld93k9qnh6teuodm1m876r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.parsadev.parsavault",
+            "certificate_hash": "257c4c49e4bf66797e7f31f27cbb0d74c33d2a40"
+          }
+        },
+        {
+          "client_id": "54301561490-u02u26g9c4c9nelb5jlffl6drfromujv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.parsadev.parsavault",
+            "certificate_hash": "b376df7c3809cc3d773ad0f4d9a8d0c65afa17ca"
+          }
+        },
+        {
+          "client_id": "54301561490-lmhohroqa1hmvug0a59e1g1u04e1mhhc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC1dG-3OpM8ho2_mQztYra1P6j84ycHhPc"
@@ -20,7 +41,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "54301561490-lmhohroqa1hmvug0a59e1g1u04e1mhhc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "54301561490-5bbur5bkmg5npojgh3mjsj3q41a3qhd1.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.parsadev.parsaVault2"
+              }
+            }
+          ]
         }
       }
     }

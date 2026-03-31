@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+
 import '../../models/user.dart';
 import '../../models/holding.dart';
 import '../../models/app_transaction.dart';
@@ -167,7 +168,7 @@ class PortfolioService {
 
     final remainingShares = holding.shares - shares;
     if (remainingShares <= 0.000001) {
-      await _holdingRepo.delete(holding.id);
+      await _holdingRepo.deleteBySymbol(user.id, symbol);
     } else {
       await _holdingRepo.update(
           holding.copyWith(shares: remainingShares, lastUpdatedAt: DateTime.now()));

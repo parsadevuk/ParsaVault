@@ -57,15 +57,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _startSequence() async {
     await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
     _logoController.forward();
 
     await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
     _nameController.forward();
 
     await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
     _taglineController.forward();
 
     await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
     _barController.forward();
 
     // Wait for bar to finish then route

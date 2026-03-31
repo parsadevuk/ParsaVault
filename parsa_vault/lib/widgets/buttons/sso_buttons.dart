@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -26,92 +28,73 @@ class SsoDivider extends StatelessWidget {
   }
 }
 
-class AppleSignInButton extends StatelessWidget {
-  final VoidCallback? onPressed;
+/// A row of SSO icon-only square buttons.
+/// Apple is shown on iOS only.
+class SsoIconRow extends StatelessWidget {
+  final VoidCallback? onApple;
+  final VoidCallback? onGoogle;
+  final VoidCallback? onMicrosoft;
 
-  const AppleSignInButton({super.key, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return _SsoButton(
-      onPressed: onPressed,
-      backgroundColor: AppColors.nearBlack,
-      border: null,
-      icon: const Icon(Icons.apple, color: Colors.white, size: 22),
-      label: Text(
-        'Sign in with Apple',
-        style: AppTextStyles.buttonText.copyWith(fontWeight: FontWeight.w500),
-      ),
-    );
-  }
-}
-
-class GoogleSignInButton extends StatelessWidget {
-  final VoidCallback? onPressed;
-
-  const GoogleSignInButton({super.key, this.onPressed});
+  const SsoIconRow({
+    super.key,
+    this.onApple,
+    this.onGoogle,
+    this.onMicrosoft,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return _SsoButton(
-      onPressed: onPressed,
-      backgroundColor: AppColors.white,
-      border: Border.all(color: AppColors.borderGrey, width: 1.5),
-      icon: const _GoogleGIcon(),
-      label: Text(
-        'Continue with Google',
-        style: AppTextStyles.buttonText.copyWith(
-          color: AppColors.nearBlack,
-          fontWeight: FontWeight.w500,
+    final buttons = <Widget>[
+      if (Platform.isIOS)
+        _SsoSquareButton(
+          onPressed: onApple,
+          backgroundColor: AppColors.nearBlack,
+          border: null,
+          icon: const Icon(Icons.apple, color: Colors.white, size: 26),
         ),
+      _SsoSquareButton(
+        onPressed: onGoogle,
+        backgroundColor: AppColors.white,
+        border: Border.all(color: AppColors.borderGrey, width: 1.5),
+        icon: const _GoogleGIcon(),
       ),
+      _SsoSquareButton(
+        onPressed: onMicrosoft,
+        backgroundColor: AppColors.white,
+        border: Border.all(color: AppColors.borderGrey, width: 1.5),
+        icon: const _MicrosoftIcon(),
+      ),
+    ];
+
+    return Row(
+      children: [
+        for (int i = 0; i < buttons.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          Expanded(child: buttons[i]),
+        ],
+      ],
     );
   }
 }
 
-class MicrosoftSignInButton extends StatelessWidget {
-  final VoidCallback? onPressed;
+// ── Square button shell ─────────────────────────────────────────────────────
 
-  const MicrosoftSignInButton({super.key, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return _SsoButton(
-      onPressed: onPressed,
-      backgroundColor: AppColors.white,
-      border: Border.all(color: AppColors.borderGrey, width: 1.5),
-      icon: const _MicrosoftIcon(),
-      label: Text(
-        'Continue with Microsoft',
-        style: AppTextStyles.buttonText.copyWith(
-          color: AppColors.nearBlack,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Shared button shell ────────────────────────────────────────────────────────
-class _SsoButton extends StatelessWidget {
+class _SsoSquareButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final Color backgroundColor;
   final BoxBorder? border;
   final Widget icon;
-  final Widget label;
 
-  const _SsoButton({
+  const _SsoSquareButton({
     required this.onPressed,
     required this.backgroundColor,
     required this.border,
     required this.icon,
-    required this.label,
   });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: double.infinity,
       height: 52,
       child: Material(
         color: Colors.transparent,
@@ -126,14 +109,7 @@ class _SsoButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: border,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  icon,
-                  const SizedBox(width: 10),
-                  label,
-                ],
-              ),
+              child: Center(child: icon),
             ),
           ),
         ),
@@ -142,7 +118,8 @@ class _SsoButton extends StatelessWidget {
   }
 }
 
-// ── Icons ──────────────────────────────────────────────────────────────────────
+// ── Icons ───────────────────────────────────────────────────────────────────
+
 class _GoogleGIcon extends StatelessWidget {
   const _GoogleGIcon();
 
@@ -155,7 +132,7 @@ class _GoogleGIcon extends StatelessWidget {
         child: Text(
           'G',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Color(0xFF4285F4),
           ),

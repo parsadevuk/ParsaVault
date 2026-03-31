@@ -1,10 +1,6 @@
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../models/user.dart';
 import '../../utils/constants.dart';
@@ -15,8 +11,14 @@ class AuthResult {
   final bool success;
   final String? error;
   final User? user;
+  final bool isNewUser;
 
-  const AuthResult({required this.success, this.error, this.user});
+  const AuthResult({
+    required this.success,
+    this.error,
+    this.user,
+    this.isNewUser = false,
+  });
 }
 
 class AuthService {
@@ -179,9 +181,10 @@ class AuthService {
 
   Future<AuthResult> signInWithGoogle() async {
     try {
-      final googleUser = await GoogleSignIn().signIn();
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut(); // Clear cached account so picker always shows
+      final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        // User cancelled the picker
         return const AuthResult(success: false, error: null);
       }
 
@@ -192,63 +195,50 @@ class AuthService {
       );
 
       final userCredential = await _auth.signInWithCredential(credential);
-      final user = await _getOrCreateSsoProfile(userCredential.user!);
+      final (:user, :isNew) =
+          await _getOrCreateSsoProfile(userCredential.user!);
       final updatedUser = await _awardDailyLoginXp(user);
       await _userRepo.updateLastLogin(updatedUser.id);
 
-      return AuthResult(success: true, user: updatedUser);
+      return AuthResult(success: true, user: updatedUser, isNewUser: isNew);
     } on fb.FirebaseAuthException catch (e) {
       return AuthResult(success: false, error: _authError(e.code));
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('Google SSO error: $e\n$stack');
       return const AuthResult(
           success: false, error: 'Google sign-in failed. Please try again.');
     }
   }
 
   // ── Apple SSO ─────────────────────────────────────────────────────────────
+  // Uses Firebase's built-in AppleAuthProvider which handles nonce internally.
 
   Future<AuthResult> signInWithApple() async {
-    final rawNonce = _generateNonce();
-    final hashedNonce = _sha256(rawNonce);
-
     try {
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        nonce: hashedNonce,
-      );
+      final provider = fb.AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name');
 
-      final oauthCredential = fb.OAuthProvider('apple.com').credential(
-        idToken: appleCredential.identityToken,
-        rawNonce: rawNonce,
-      );
-
-      final userCredential = await _auth.signInWithCredential(oauthCredential);
-
-      // Apple only provides the name on first sign-in — cache it
-      final fbUser = userCredential.user!;
-      if (appleCredential.givenName != null) {
-        final fullName =
-            '${appleCredential.givenName} ${appleCredential.familyName ?? ''}'
-                .trim();
-        await fbUser.updateDisplayName(fullName);
-      }
-
-      final user = await _getOrCreateSsoProfile(fbUser);
+      final userCredential = await _auth.signInWithProvider(provider);
+      final (:user, :isNew) =
+          await _getOrCreateSsoProfile(userCredential.user!);
       final updatedUser = await _awardDailyLoginXp(user);
       await _userRepo.updateLastLogin(updatedUser.id);
 
-      return AuthResult(success: true, user: updatedUser);
-    } on SignInWithAppleAuthorizationException catch (e) {
-      if (e.code == AuthorizationErrorCode.canceled) {
-        return const AuthResult(success: false, error: null); // user cancelled
+      return AuthResult(success: true, user: updatedUser, isNewUser: isNew);
+    } on fb.FirebaseAuthException catch (e) {
+      if (e.code == 'canceled' || e.code == 'web-context-canceled') {
+        return const AuthResult(success: false, error: null);
+      }
+      return AuthResult(success: false, error: _authError(e.code));
+    } catch (e) {
+      if (e.toString().contains('cancel') ||
+          e.toString().contains('Cancel') ||
+          e.toString().contains('1001')) {
+        return const AuthResult(success: false, error: null);
       }
       return const AuthResult(
           success: false, error: 'Apple sign-in failed. Please try again.');
-    } on fb.FirebaseAuthException catch (e) {
-      return AuthResult(success: false, error: _authError(e.code));
     }
   }
 
@@ -262,11 +252,12 @@ class AuthService {
         ..addScope('profile');
 
       final userCredential = await _auth.signInWithProvider(provider);
-      final user = await _getOrCreateSsoProfile(userCredential.user!);
+      final (:user, :isNew) =
+          await _getOrCreateSsoProfile(userCredential.user!);
       final updatedUser = await _awardDailyLoginXp(user);
       await _userRepo.updateLastLogin(updatedUser.id);
 
-      return AuthResult(success: true, user: updatedUser);
+      return AuthResult(success: true, user: updatedUser, isNewUser: isNew);
     } on fb.FirebaseAuthException catch (e) {
       return AuthResult(success: false, error: _authError(e.code));
     } catch (_) {
@@ -283,7 +274,21 @@ class AuthService {
     return user!;
   }
 
+  /// Returns an error message if the image exceeds 200 KB, otherwise null.
+  String? validateProfilePicture(String base64Image) {
+    // base64 length * 3/4 ≈ original byte size
+    final estimatedBytes = (base64Image.length * 3 / 4).round();
+    if (estimatedBytes > 200 * 1024) {
+      return 'Image is too large. Please choose a photo under 200 KB.';
+    }
+    return null;
+  }
+
   Future<void> updateProfilePicture(String userId, String? base64Image) async {
+    if (base64Image != null) {
+      final error = validateProfilePicture(base64Image);
+      if (error != null) throw Exception(error);
+    }
     await _userRepo.updateProfilePicture(userId, base64Image);
   }
 
@@ -294,9 +299,18 @@ class AuthService {
   // ── Private helpers ───────────────────────────────────────────────────────
 
   /// Gets an existing local profile or creates a new one for SSO sign-ins.
-  Future<User> _getOrCreateSsoProfile(fb.User fbUser) async {
+  /// Returns `(user, isNew)` — isNew is true when the profile was just created.
+  Future<({User user, bool isNew})> _getOrCreateSsoProfile(
+      fb.User fbUser) async {
+    // 1. Check by Firebase UID (returning user)
     final existing = await _userRepo.findById(fbUser.uid);
-    if (existing != null) return existing;
+    if (existing != null) return (user: existing, isNew: false);
+
+    // 2. Check by email — user may have registered with email/password before
+    if (fbUser.email != null && fbUser.email!.isNotEmpty) {
+      final byEmail = await _userRepo.findByEmail(fbUser.email!);
+      if (byEmail != null) return (user: byEmail, isNew: false);
+    }
 
     final base = _generateUsername(
         fbUser.displayName, fbUser.email ?? fbUser.uid.substring(0, 8));
@@ -319,7 +333,32 @@ class AuthService {
     );
 
     await _userRepo.insert(user);
-    return user;
+    return (user: user, isNew: true);
+  }
+
+  // ── Profile completion (SSO new users) ────────────────────────────────────
+
+  Future<bool> isUsernameTaken(String username,
+      {required String excludingUserId}) async {
+    final existing = await _userRepo.findByUsername(username);
+    if (existing == null) return false;
+    return existing.id != excludingUserId;
+  }
+
+  Future<AuthResult> completeProfile({
+    required String userId,
+    required String username,
+    String? website,
+  }) async {
+    final trimmed = username.trim().toLowerCase();
+    if (await isUsernameTaken(trimmed, excludingUserId: userId)) {
+      return const AuthResult(
+          success: false, error: 'That username is already taken.');
+    }
+    await _userRepo.updateUsername(userId, trimmed);
+    await _userRepo.updateWebsite(userId, website);
+    final user = await _userRepo.findById(userId);
+    return AuthResult(success: true, user: user);
   }
 
   String _generateUsername(String? displayName, String email) {
@@ -373,19 +412,6 @@ class AuthService {
     }
 
     return user;
-  }
-
-  String _generateNonce([int length = 32]) {
-    const charset =
-        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
-    final random = Random.secure();
-    return List.generate(
-        length, (_) => charset[random.nextInt(charset.length)]).join();
-  }
-
-  String _sha256(String input) {
-    final bytes = utf8.encode(input);
-    return sha256.convert(bytes).toString();
   }
 
   String _authError(String code) {

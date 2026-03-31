@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class User {
   final String id;
   final String fullName;
@@ -64,43 +66,46 @@ class User {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  // ── Firestore ──────────────────────────────────────────────────────────────
+
+  Map<String, dynamic> toFirestore() {
     return {
-      'id': id,
-      'full_name': fullName,
+      'fullName': fullName,
       'username': username,
       'email': email,
       'website': website,
-      'password_hash': passwordHash,
-      'cash_balance': cashBalance,
+      'cashBalance': cashBalance,
       'xp': xp,
       'level': level,
-      'profile_picture': profilePicture,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-      'last_login_at': lastLoginAt?.toIso8601String(),
+      'profilePicture': profilePicture,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+      'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
     };
   }
 
-  factory User.fromMap(Map<String, dynamic> map) {
+  factory User.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
     return User(
-      id: map['id'] as String,
-      fullName: map['full_name'] as String,
-      username: map['username'] as String,
-      email: map['email'] as String,
-      website: map['website'] as String?,
-      passwordHash: map['password_hash'] as String,
-      cashBalance: (map['cash_balance'] as num).toDouble(),
-      xp: map['xp'] as int,
-      level: map['level'] as int,
-      profilePicture: map['profile_picture'] as String?,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
-      lastLoginAt: map['last_login_at'] != null
-          ? DateTime.parse(map['last_login_at'] as String)
-          : null,
+      id: doc.id,
+      fullName: data['fullName'] as String? ?? '',
+      username: data['username'] as String? ?? '',
+      email: data['email'] as String? ?? '',
+      website: data['website'] as String?,
+      passwordHash: '',
+      cashBalance: (data['cashBalance'] as num?)?.toDouble() ?? 0.0,
+      xp: (data['xp'] as num?)?.toInt() ?? 0,
+      level: (data['level'] as num?)?.toInt() ?? 1,
+      profilePicture: data['profilePicture'] as String?,
+      createdAt:
+          (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now().toUtc(),
+      updatedAt:
+          (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now().toUtc(),
+      lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate(),
     );
   }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   String get firstName => fullName.split(' ').first;
 

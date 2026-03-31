@@ -9,6 +9,7 @@ import '../../widgets/buttons/sso_buttons.dart';
 import '../../widgets/inputs/gold_input_field.dart';
 import '../main/main_navigation.dart';
 import 'register_screen.dart';
+import 'sso_complete_profile_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -42,7 +43,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _ssoSignIn(Future<bool> Function() ssoCall) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final success = await ssoCall();
-    if (success && mounted) _goHome();
+    if (!success || !mounted) return;
+    if (ref.read(authProvider).isNewSsoUser) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (_) => const SsoCompleteProfileScreen()),
+        (_) => false,
+      );
+    } else {
+      _goHome();
+    }
   }
 
   void _goHome() {
@@ -203,18 +213,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   // SSO divider + buttons
                   const SsoDivider(),
-                  AppleSignInButton(
-                    onPressed: () => _ssoSignIn(
+                  SsoIconRow(
+                    onApple: () => _ssoSignIn(
                         () => ref.read(authProvider.notifier).signInWithApple()),
-                  ),
-                  const SizedBox(height: 12),
-                  GoogleSignInButton(
-                    onPressed: () => _ssoSignIn(
+                    onGoogle: () => _ssoSignIn(
                         () => ref.read(authProvider.notifier).signInWithGoogle()),
-                  ),
-                  const SizedBox(height: 12),
-                  MicrosoftSignInButton(
-                    onPressed: () => _ssoSignIn(
+                    onMicrosoft: () => _ssoSignIn(
                         () => ref.read(authProvider.notifier).signInWithMicrosoft()),
                   ),
                   const SizedBox(height: 40),

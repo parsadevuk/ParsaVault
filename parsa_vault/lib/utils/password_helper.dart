@@ -1,19 +1,5 @@
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
-
 class PasswordHelper {
   PasswordHelper._();
-
-  static const String _salt = 'pv_s4lt_2024_secure';
-
-  static String hash(String password) {
-    final bytes = utf8.encode(password + _salt);
-    return sha256.convert(bytes).toString();
-  }
-
-  static bool verify(String password, String hash) {
-    return PasswordHelper.hash(password) == hash;
-  }
 
   static PasswordStrength strength(String password) {
     if (password.length < 6) return PasswordStrength.weak;
