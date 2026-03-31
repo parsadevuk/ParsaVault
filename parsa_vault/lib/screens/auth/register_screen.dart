@@ -11,12 +11,36 @@ import '../../widgets/inputs/gold_input_field.dart';
 import '../main/main_navigation.dart';
 import 'login_screen.dart';
 import 'sso_complete_profile_screen.dart';
+import 'welcome_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+// ── Back button ───────────────────────────────────────────────────────────────
+class _RegisterBackButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).maybePop(),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderGrey, width: 1.5),
+        ),
+        child: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 16,
+          color: AppColors.nearBlack,
+        ),
+      ),
+    );
+  }
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
@@ -121,26 +145,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 12),
+
+                  // Back button
+                  _RegisterBackButton(),
+                  const SizedBox(height: 12),
 
                   // Logo
                   Center(
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.gold, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'P',
-                          style: AppTextStyles.screenTitle.copyWith(
-                            color: AppColors.gold,
-                            fontSize: 28,
-                          ),
-                        ),
-                      ),
+                    child: Image.asset(
+                      'assets/images/logo_transparent_full.png',
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -271,8 +288,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Center(
                     child: GestureDetector(
                       onTap: () => Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                            builder: (_) => const LoginScreen()),
+                        PageRouteBuilder(
+                          pageBuilder: (_, __, ___) => const LoginScreen(),
+                          transitionsBuilder: (_, anim, __, child) =>
+                              FadeTransition(opacity: anim, child: child),
+                          transitionDuration: const Duration(milliseconds: 250),
+                        ),
                       ),
                       child: RichText(
                         text: TextSpan(

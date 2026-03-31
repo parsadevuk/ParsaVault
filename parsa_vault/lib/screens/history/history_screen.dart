@@ -97,37 +97,49 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             const SizedBox(height: 8),
 
             Expanded(
-              child: filtered.isEmpty
-                  ? EmptyState(
-                      icon: Icons.receipt_long_outlined,
-                      title: 'No trades yet.',
-                      body:
-                          'Make your first trade and it\'ll show up here.',
-                      buttonLabel: 'Go to Markets',
-                      onButtonTap: () {
-                        ref.read(navigationIndexProvider.notifier).state = 1;
-                      },
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.only(top: 8, bottom: 24),
-                      children: [
-                        for (final entry in grouped.entries) ...[
-                          // Date header
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                            child: Text(
-                              entry.key,
-                              style: AppTextStyles.captionBold
-                                  .copyWith(fontSize: 13),
+              child: RefreshIndicator(
+                color: AppColors.gold,
+                onRefresh: () =>
+                    ref.read(portfolioProvider.notifier).loadAll(),
+                child: filtered.isEmpty
+                    ? ListView(
+                        // ListView needed so RefreshIndicator works on empty state
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.55,
+                            child: EmptyState(
+                              icon: Icons.receipt_long_outlined,
+                              title: 'No trades yet.',
+                              body: 'Make your first trade and it\'ll show up here.',
+                              buttonLabel: 'Go to Markets',
+                              onButtonTap: () {
+                                ref.read(navigationIndexProvider.notifier).state = 1;
+                              },
                             ),
                           ),
-                          for (final tx in entry.value) ...[
-                            TransactionTile(tx: tx),
-                            const SizedBox(height: 8),
+                        ],
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.only(top: 8, bottom: 24),
+                        children: [
+                          for (final entry in grouped.entries) ...[
+                            // Date header
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                              child: Text(
+                                entry.key,
+                                style: AppTextStyles.captionBold
+                                    .copyWith(fontSize: 13),
+                              ),
+                            ),
+                            for (final tx in entry.value) ...[
+                              TransactionTile(tx: tx),
+                              const SizedBox(height: 8),
+                            ],
                           ],
                         ],
-                      ],
-                    ),
+                      ),
+              ),
             ),
           ],
         ),

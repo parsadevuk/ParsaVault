@@ -27,13 +27,13 @@ class GoldButton extends StatelessWidget {
           backgroundColor: onPressed == null && !isLoading
               ? AppColors.borderGrey
               : AppColors.gold,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.nearBlack,
           disabledBackgroundColor: AppColors.borderGrey,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(100),
           ),
           elevation: 0,
-          shadowColor: Colors.transparent,
+          shadowColor: AppColors.gold.withValues(alpha: 0.4),
           overlayColor: AppColors.darkGold,
         ),
         child: isLoading

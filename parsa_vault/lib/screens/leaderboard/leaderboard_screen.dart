@@ -137,6 +137,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                   final currentId = currentUser?.id ?? '';
                   final entries = _toEntries(users, currentId);
 
+                  Future<void> doRefresh() async =>
+                      ref.invalidate(leaderboardProvider);
+
                   return TabBarView(
                     controller: _tabController,
                     children: [
@@ -145,6 +148,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                         entries: entries,
                         periodLabel: _periodLabel('alltime'),
                         showComingSoon: false,
+                        onRefresh: doRefresh,
                       ),
                       // Weekly — current user only for now
                       _LeaderboardList(
@@ -153,6 +157,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                             .toList(),
                         periodLabel: _periodLabel('weekly'),
                         showComingSoon: true,
+                        onRefresh: doRefresh,
                       ),
                       // Daily — current user only for now
                       _LeaderboardList(
@@ -161,6 +166,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                             .toList(),
                         periodLabel: _periodLabel('daily'),
                         showComingSoon: true,
+                        onRefresh: doRefresh,
                       ),
                     ],
                   );
@@ -178,16 +184,21 @@ class _LeaderboardList extends StatelessWidget {
   final List<_LeaderboardEntry> entries;
   final String periodLabel;
   final bool showComingSoon;
+  final Future<void> Function() onRefresh;
 
   const _LeaderboardList({
     required this.entries,
     required this.periodLabel,
     required this.showComingSoon,
+    required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return RefreshIndicator(
+      color: AppColors.gold,
+      onRefresh: onRefresh,
+      child: ListView(
       padding: const EdgeInsets.only(top: 12, bottom: 24),
       children: [
         Padding(
@@ -240,7 +251,8 @@ class _LeaderboardList extends StatelessWidget {
           ),
         ],
       ],
-    );
+    ), // end ListView
+    ); // end RefreshIndicator
   }
 }
 

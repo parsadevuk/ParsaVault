@@ -4,7 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding/onboarding_screen.dart';
-import '../auth/login_screen.dart';
+import '../auth/welcome_screen.dart';
 import '../main/main_navigation.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -89,7 +89,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         destination = const MainNavigation();
         break;
       case AuthStatus.unauthenticated:
-        destination = const LoginScreen();
+        destination = const WelcomeScreen();
         break;
       case AuthStatus.noUsers:
         destination = const OnboardingScreen();

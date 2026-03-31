@@ -67,10 +67,11 @@ class SsoIconRow extends StatelessWidget {
     ];
 
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (int i = 0; i < buttons.length; i++) ...[
-          if (i > 0) const SizedBox(width: 12),
-          Expanded(child: buttons[i]),
+          if (i > 0) const SizedBox(width: 16),
+          buttons[i],
         ],
       ],
     );
@@ -95,18 +96,19 @@ class _SsoSquareButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      width: 64,
+      height: 64,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Opacity(
             opacity: onPressed == null ? 0.45 : 1.0,
             child: Container(
               decoration: BoxDecoration(
                 color: backgroundColor,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: border,
               ),
               child: Center(child: icon),

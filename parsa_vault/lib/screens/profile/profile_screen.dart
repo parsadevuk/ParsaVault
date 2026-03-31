@@ -8,13 +8,12 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/formatters.dart';
 import '../../utils/validators.dart';
-import '../../widgets/buttons/destructive_button.dart';
 import '../../widgets/common/xp_progress_bar.dart';
 import '../../widgets/common/level_badge.dart';
 import '../../widgets/common/confirmation_dialog.dart';
 import '../../widgets/inputs/gold_input_field.dart';
 import '../../widgets/buttons/gold_button.dart';
-import '../auth/login_screen.dart';
+import '../auth/welcome_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -184,20 +183,20 @@ class ProfileScreen extends ConsumerWidget {
             Row(
               children: [
                 Expanded(
-                  child: _ColoredOutlineButton(
+                  child: _FilledPillButton(
                     label: 'Deposit',
-                    icon: Icons.add_rounded,
                     color: AppColors.dangerRed,
+                    icon: Icons.add_rounded,
                     onPressed: () =>
                         _showCashSheet(context, ref, isDeposit: true),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _ColoredOutlineButton(
+                  child: _FilledPillButton(
                     label: 'Withdraw',
-                    icon: Icons.arrow_upward_rounded,
                     color: AppColors.successGreen,
+                    icon: Icons.arrow_upward_rounded,
                     onPressed: () =>
                         _showCashSheet(context, ref, isDeposit: false),
                   ),
@@ -233,18 +232,10 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 4),
             const Divider(),
             const SizedBox(height: 16),
-            DestructiveButton(
-              label: 'Reset Portfolio',
-              onPressed: () => _resetPortfolio(context, ref),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Clears your holdings. Keeps your XP.',
-              style: AppTextStyles.caption,
-            ),
-            const SizedBox(height: 12),
-            DestructiveButton(
+            _FilledPillButton(
               label: 'Reset All Progress',
+              color: AppColors.dangerRed,
+              icon: Icons.refresh_rounded,
               onPressed: () => _resetAll(context, ref),
             ),
             const SizedBox(height: 6),
@@ -252,28 +243,14 @@ class ProfileScreen extends ConsumerWidget {
               'Resets everything. XP, level, balance. Fresh start.',
               style: AppTextStyles.caption,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
 
-            // Logout — prominent but calm
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () => _logout(context, ref),
-                icon: const Icon(Icons.logout_rounded,
-                    size: 18, color: AppColors.dangerRed),
-                label: Text(
-                  'Log Out',
-                  style: AppTextStyles.buttonText
-                      .copyWith(color: AppColors.dangerRed),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(
-                      color: AppColors.dangerRed, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
+            // Logout
+            _FilledPillButton(
+              label: 'Log Out',
+              color: AppColors.dangerRed,
+              icon: Icons.logout_rounded,
+              onPressed: () => _logout(context, ref),
             ),
             const SizedBox(height: 32),
           ],
@@ -384,32 +361,14 @@ class ProfileScreen extends ConsumerWidget {
     final navigator = Navigator.of(context);
     await ref.read(authProvider.notifier).logout();
     navigator.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const WelcomeScreen(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
       (_) => false,
     );
-  }
-
-  Future<void> _resetPortfolio(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showConfirmationDialog(
-      context: context,
-      title: 'Reset your portfolio?',
-      body:
-          'This clears all your holdings and sets your cash back to \$10,000. Your XP and level stay.',
-      confirmLabel: 'Reset Portfolio',
-    );
-    if (!confirmed || !context.mounted) return;
-    await ref.read(portfolioProvider.notifier).resetPortfolio();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Portfolio reset. Starting fresh with \$10,000.'),
-          backgroundColor: AppColors.nearBlack,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    }
   }
 
   Future<void> _resetAll(BuildContext context, WidgetRef ref) async {
@@ -867,38 +826,64 @@ class _NeutralOutlineButton extends StatelessWidget {
   }
 }
 
-// ── Coloured outline button (deposit = red, withdraw = green) ─────────────────
-class _ColoredOutlineButton extends StatelessWidget {
+// ── Filled pill button (danger red / success green) ───────────────────────────
+class _FilledPillButton extends StatelessWidget {
   final String label;
-  final IconData icon;
   final Color color;
   final VoidCallback? onPressed;
+  final IconData? icon;
 
-  const _ColoredOutlineButton({
+  const _FilledPillButton({
     required this.label,
-    required this.icon,
     required this.color,
     this.onPressed,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18, color: color),
-        label: Text(
-          label,
-          style: AppTextStyles.buttonText.copyWith(color: color),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: color, width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+    final style = ElevatedButton.styleFrom(
+      backgroundColor: color,
+      foregroundColor: Colors.white,
+      disabledBackgroundColor: AppColors.borderGrey,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(100),
       ),
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+    );
+
+    final labelText = Text(
+      label,
+      style: AppTextStyles.buttonText.copyWith(color: Colors.white),
+    );
+
+    return Container(
+      width: double.infinity,
+      height: 52,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: icon != null
+          ? ElevatedButton.icon(
+              onPressed: onPressed,
+              icon: Icon(icon, size: 18, color: Colors.white),
+              label: labelText,
+              style: style,
+            )
+          : ElevatedButton(
+              onPressed: onPressed,
+              style: style,
+              child: labelText,
+            ),
     );
   }
 }

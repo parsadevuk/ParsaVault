@@ -10,12 +10,36 @@ import '../../widgets/inputs/gold_input_field.dart';
 import '../main/main_navigation.dart';
 import 'register_screen.dart';
 import 'sso_complete_profile_screen.dart';
+import 'welcome_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+// ── Back button ───────────────────────────────────────────────────────────────
+class _BackButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).maybePop(),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderGrey, width: 1.5),
+        ),
+        child: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 16,
+          color: AppColors.nearBlack,
+        ),
+      ),
+    );
+  }
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
@@ -81,26 +105,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 64),
+                  const SizedBox(height: 12),
+
+                  // Back button
+                  _BackButton(),
+                  const SizedBox(height: 20),
 
                   // Logo
                   Center(
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.gold, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'P',
-                          style: AppTextStyles.screenTitle.copyWith(
-                            color: AppColors.gold,
-                            fontSize: 28,
-                          ),
-                        ),
-                      ),
+                    child: Image.asset(
+                      'assets/images/logo_transparent_full.png',
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -191,8 +208,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Center(
                     child: GestureDetector(
                       onTap: () => Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                            builder: (_) => const RegisterScreen()),
+                        PageRouteBuilder(
+                          pageBuilder: (_, __, ___) => const RegisterScreen(),
+                          transitionsBuilder: (_, anim, __, child) =>
+                              FadeTransition(opacity: anim, child: child),
+                          transitionDuration: const Duration(milliseconds: 250),
+                        ),
                       ),
                       child: RichText(
                         text: TextSpan(

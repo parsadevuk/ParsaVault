@@ -220,7 +220,15 @@ class PortfolioNotifier extends StateNotifier<PortfolioState> {
 final portfolioProvider =
     StateNotifierProvider<PortfolioNotifier, PortfolioState>((ref) {
   final notifier = PortfolioNotifier(ref);
-  // Load holdings when auth changes to authenticated
+
+  // Load immediately if auth is already authenticated when this provider is
+  // first created — handles session restore where auth finishes BEFORE this
+  // provider is accessed (the listener below would miss that transition).
+  if (ref.read(authProvider).isAuthenticated) {
+    Future.microtask(() => notifier.loadAll());
+  }
+
+  // Also load whenever auth transitions into authenticated (normal login flow).
   ref.listen(authProvider, (prev, next) {
     if (next.isAuthenticated && !(prev?.isAuthenticated ?? false)) {
       notifier.loadAll();
