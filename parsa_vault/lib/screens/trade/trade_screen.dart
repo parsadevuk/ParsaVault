@@ -91,18 +91,25 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
       final cash = ref.read(authProvider).user?.cashBalance ?? 0;
       if (cash <= 0 || price <= 0) return;
       if (_isAmountMode) {
-        _inputCtrl.text = (cash * pct).toStringAsFixed(2);
+        // Floor dollar amount to cents so actual cost never exceeds cash
+        final rawAmount = cash * pct;
+        final flooredAmount = (rawAmount * 100).floorToDouble() / 100;
+        _inputCtrl.text = flooredAmount.toStringAsFixed(2);
       } else {
-        _inputCtrl.text = _trimTo3((cash * pct) / price);
+        // Floor shares to 5dp — never spend more than available cash
+        final rawShares = (cash * pct) / price;
+        final flooredShares = (rawShares * 100000).floorToDouble() / 100000;
+        _inputCtrl.text = _trimTo5(flooredShares);
       }
     } else {
       // Sell: percentage of owned shares
       final owned = _holding?.shares ?? 0;
       if (owned <= 0) return;
-      final sharesAmount = owned * pct;
-      final trimmed = _trimTo3(sharesAmount);
+      // For 100% (Max), use exact stored value to avoid IEEE 754 drift
+      final sharesAmount = pct >= 1.0 ? owned : owned * pct;
+      final trimmed = _trimTo5(sharesAmount);
 
-      // If the holding is a tiny fraction that 3dp can't represent (e.g. 0.000438),
+      // If the holding is a tiny fraction that 5dp can't represent (e.g. 0.000001),
       // auto-switch to $ Amount mode so the user can still sell it.
       if (!_isAmountMode && (trimmed.isEmpty || double.tryParse(trimmed) == 0)) {
         setState(() => _isAmountMode = true);
@@ -119,6 +126,12 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
   String _trimTo3(double val) {
     // Show up to 3 decimal places, strip trailing zeros
     final s = val.toStringAsFixed(3);
+    return s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+  }
+
+  String _trimTo5(double val) {
+    // Show up to 5 decimal places (floored shares), strip trailing zeros
+    final s = val.toStringAsFixed(5);
     return s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
   }
 
@@ -201,7 +214,8 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
           centerTitle: true,
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.fromLTRB(
+              24, 0, 24, MediaQuery.of(context).padding.bottom + 24),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,9 +358,11 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
                 keyboardType: const TextInputType.numberWithOptions(
                     decimal: true),
                 inputFormatters: [
-                  // Allow digits + one dot + max 3 decimal places
+                  // Allow digits + one dot + up to 5dp (shares) or 2dp (amount)
                   FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*\.?\d{0,3}')),
+                      _isAmountMode
+                          ? RegExp(r'^\d*\.?\d{0,2}')
+                          : RegExp(r'^\d*\.?\d{0,5}')),
                 ],
                 style: AppTextStyles.priceLarge.copyWith(fontSize: 26),
                 textAlign: TextAlign.center,
@@ -355,7 +371,7 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
                 onEditingComplete: () =>
                     FocusManager.instance.primaryFocus?.unfocus(),
                 decoration: InputDecoration(
-                  hintText: _isAmountMode ? '0.00' : '0.000',
+                  hintText: _isAmountMode ? '0.00' : '0.00000',
                   hintStyle: AppTextStyles.priceLarge.copyWith(
                       fontSize: 26, color: AppColors.borderGrey),
                   prefixText: _isAmountMode ? '\$  ' : null,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../auth/welcome_screen.dart';
 import '../main/main_navigation.dart';
@@ -16,14 +15,10 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _logoController;
-  late AnimationController _nameController;
-  late AnimationController _taglineController;
+  late AnimationController _fadeController;
   late AnimationController _barController;
 
   late Animation<double> _logoFade;
-  late Animation<double> _nameFade;
-  late Animation<double> _taglineFade;
   late Animation<double> _barProgress;
 
   bool _navigated = false;
@@ -36,39 +31,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   void _setupAnimations() {
-    _logoController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
-    _nameController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
-    _taglineController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
+    _fadeController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600));
     _barController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 2800));
 
     _logoFade =
-        CurvedAnimation(parent: _logoController, curve: Curves.easeOut);
-    _nameFade =
-        CurvedAnimation(parent: _nameController, curve: Curves.easeOut);
-    _taglineFade =
-        CurvedAnimation(parent: _taglineController, curve: Curves.easeOut);
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
     _barProgress =
         CurvedAnimation(parent: _barController, curve: Curves.easeInOut);
   }
 
   Future<void> _startSequence() async {
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future.delayed(const Duration(milliseconds: 80));
     if (!mounted) return;
-    _logoController.forward();
+    _fadeController.forward();
 
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    _nameController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    _taglineController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     _barController.forward();
 
@@ -116,9 +95,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   void dispose() {
-    _logoController.dispose();
-    _nameController.dispose();
-    _taglineController.dispose();
+    _fadeController.dispose();
     _barController.dispose();
     super.dispose();
   }
@@ -133,51 +110,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     });
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // Centred logo + text
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Logo placeholder (gold P in a circle)
-                FadeTransition(
-                  opacity: _logoFade,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.gold, width: 2.5),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'P',
-                        style: AppTextStyles.displayHeadline.copyWith(
-                          fontSize: 56,
-                          color: AppColors.gold,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                FadeTransition(
-                  opacity: _nameFade,
-                  child: Text('Parsa Vault', style: AppTextStyles.displayHeadline),
-                ),
-                const SizedBox(height: 10),
-                FadeTransition(
-                  opacity: _taglineFade,
-                  child: Text(
-                    'Secure your wealth. Master the markets.',
-                    style: AppTextStyles.tagline,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
+          // Full-screen loading screen image with fade-in
+          FadeTransition(
+            opacity: _logoFade,
+            child: Image.asset(
+              'assets/images/splash_screen.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
             ),
           ),
 
@@ -191,7 +134,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               builder: (_, __) => LinearProgressIndicator(
                 value: _barProgress.value,
                 minHeight: 4,
-                backgroundColor: AppColors.borderGrey,
+                backgroundColor: Colors.white12,
                 valueColor:
                     const AlwaysStoppedAnimation<Color>(AppColors.gold),
               ),

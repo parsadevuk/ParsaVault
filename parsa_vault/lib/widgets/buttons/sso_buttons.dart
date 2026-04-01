@@ -28,7 +28,7 @@ class SsoDivider extends StatelessWidget {
   }
 }
 
-/// A row of SSO icon-only square buttons.
+/// A row of SSO image buttons using custom PNG assets.
 /// Apple is shown on iOS only.
 class SsoIconRow extends StatelessWidget {
   final VoidCallback? onApple;
@@ -46,23 +46,17 @@ class SsoIconRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final buttons = <Widget>[
       if (Platform.isIOS)
-        _SsoSquareButton(
+        _SsoImageButton(
           onPressed: onApple,
-          backgroundColor: AppColors.nearBlack,
-          border: null,
-          icon: const Icon(Icons.apple, color: Colors.white, size: 26),
+          assetPath: 'assets/images/sso_apple.png',
         ),
-      _SsoSquareButton(
+      _SsoImageButton(
         onPressed: onGoogle,
-        backgroundColor: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey, width: 1.5),
-        icon: const _GoogleGIcon(),
+        assetPath: 'assets/images/sso_google.png',
       ),
-      _SsoSquareButton(
+      _SsoImageButton(
         onPressed: onMicrosoft,
-        backgroundColor: AppColors.white,
-        border: Border.all(color: AppColors.borderGrey, width: 1.5),
-        icon: const _MicrosoftIcon(),
+        assetPath: 'assets/images/sso_microsoft.png',
       ),
     ];
 
@@ -70,7 +64,7 @@ class SsoIconRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (int i = 0; i < buttons.length; i++) ...[
-          if (i > 0) const SizedBox(width: 16),
+          if (i > 0) const SizedBox(width: 20),
           buttons[i],
         ],
       ],
@@ -78,92 +72,29 @@ class SsoIconRow extends StatelessWidget {
   }
 }
 
-// ── Square button shell ─────────────────────────────────────────────────────
+// ── Image button ─────────────────────────────────────────────────────────────
 
-class _SsoSquareButton extends StatelessWidget {
+class _SsoImageButton extends StatelessWidget {
   final VoidCallback? onPressed;
-  final Color backgroundColor;
-  final BoxBorder? border;
-  final Widget icon;
+  final String assetPath;
 
-  const _SsoSquareButton({
+  const _SsoImageButton({
     required this.onPressed,
-    required this.backgroundColor,
-    required this.border,
-    required this.icon,
+    required this.assetPath,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      height: 64,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(14),
-          child: Opacity(
-            opacity: onPressed == null ? 0.45 : 1.0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(14),
-                border: border,
-              ),
-              child: Center(child: icon),
-            ),
-          ),
+    return Opacity(
+      opacity: onPressed == null ? 0.45 : 1.0,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Image.asset(
+          assetPath,
+          width: 58,
+          height: 58,
+          fit: BoxFit.contain,
         ),
-      ),
-    );
-  }
-}
-
-// ── Icons ───────────────────────────────────────────────────────────────────
-
-class _GoogleGIcon extends StatelessWidget {
-  const _GoogleGIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 22,
-      height: 22,
-      child: Center(
-        child: Text(
-          'G',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4285F4),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MicrosoftIcon extends StatelessWidget {
-  const _MicrosoftIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 20,
-      height: 20,
-      child: GridView.count(
-        crossAxisCount: 2,
-        padding: EdgeInsets.zero,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-        physics: const NeverScrollableScrollPhysics(),
-        children: const [
-          ColoredBox(color: Color(0xFFF25022)), // red
-          ColoredBox(color: Color(0xFF7FBA00)), // green
-          ColoredBox(color: Color(0xFF00A4EF)), // blue
-          ColoredBox(color: Color(0xFFFFB900)), // yellow
-        ],
       ),
     );
   }

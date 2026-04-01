@@ -12,6 +12,7 @@ class AuthState {
   final bool isLoading;
   final bool emailVerified;
   final bool isNewSsoUser;
+  final bool isSsoUser;
 
   const AuthState({
     this.status = AuthStatus.checking,
@@ -20,6 +21,7 @@ class AuthState {
     this.isLoading = false,
     this.emailVerified = false,
     this.isNewSsoUser = false,
+    this.isSsoUser = false,
   });
 
   AuthState copyWith({
@@ -29,6 +31,7 @@ class AuthState {
     bool? isLoading,
     bool? emailVerified,
     bool? isNewSsoUser,
+    bool? isSsoUser,
     bool clearError = false,
     bool clearUser = false,
   }) {
@@ -39,6 +42,7 @@ class AuthState {
       isLoading: isLoading ?? this.isLoading,
       emailVerified: emailVerified ?? this.emailVerified,
       isNewSsoUser: isNewSsoUser ?? this.isNewSsoUser,
+      isSsoUser: isSsoUser ?? this.isSsoUser,
     );
   }
 
@@ -62,6 +66,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           user: user,
           emailVerified: _service.isEmailVerified,
+          isSsoUser: _service.currentUserIsSso,
         );
         return;
       }
@@ -90,6 +95,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         status: AuthStatus.authenticated,
         user: result.user,
         emailVerified: _service.isEmailVerified,
+        isSsoUser: false,
       );
       return true;
     }
@@ -116,7 +122,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(
         status: AuthStatus.authenticated,
         user: result.user,
-        emailVerified: false, // New email/password users always start unverified
+        emailVerified: false,
+        isSsoUser: false,
       );
       return true;
     }
@@ -143,14 +150,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.user,
         emailVerified: true,
         isNewSsoUser: result.isNewUser,
+        isSsoUser: true,
       );
       return true;
     }
-    // null error = user cancelled — don't show an error message
-    state = state.copyWith(
-      isLoading: false,
-      error: result.error,
-    );
+    state = state.copyWith(isLoading: false, error: result.error);
     return false;
   }
 
@@ -163,13 +167,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.user,
         emailVerified: true,
         isNewSsoUser: result.isNewUser,
+        isSsoUser: true,
       );
       return true;
     }
-    state = state.copyWith(
-      isLoading: false,
-      error: result.error,
-    );
+    state = state.copyWith(isLoading: false, error: result.error);
     return false;
   }
 
@@ -182,13 +184,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: result.user,
         emailVerified: true,
         isNewSsoUser: result.isNewUser,
+        isSsoUser: true,
       );
       return true;
     }
-    state = state.copyWith(
-      isLoading: false,
-      error: result.error,
-    );
+    state = state.copyWith(isLoading: false, error: result.error);
     return false;
   }
 
@@ -258,6 +258,47 @@ class AuthNotifier extends StateNotifier<AuthState> {
         clearWebsite: (website == null || website.trim().isEmpty),
       ),
     );
+  }
+
+  Future<void> updateFullName(String fullName) async {
+    final userId = state.user?.id;
+    if (userId == null) return;
+    await _service.updateFullName(userId, fullName.trim());
+    state =
+        state.copyWith(user: state.user!.copyWith(fullName: fullName.trim()));
+  }
+
+  /// Returns error string if username taken, null on success.
+  Future<String?> updateUsername(String newUsername) async {
+    final userId = state.user?.id;
+    if (userId == null) return 'Not logged in.';
+    final error = await _service.updateUsername(userId, newUsername);
+    if (error == null) {
+      state = state.copyWith(
+          user: state.user!
+              .copyWith(username: newUsername.trim().toLowerCase()));
+    }
+    return error;
+  }
+
+  Future<void> updateLocation(String city, String country) async {
+    final userId = state.user?.id;
+    if (userId == null) return;
+    await _service.updateLocation(userId, city, country);
+    state = state.copyWith(
+      user: state.user!.copyWith(city: city.trim(), country: country.trim()),
+    );
+  }
+
+  /// Deletes all user data (Firestore + Firebase Auth). Returns error or null.
+  Future<String?> deleteAccount() async {
+    final userId = state.user?.id;
+    if (userId == null) return 'Not logged in.';
+    final error = await _service.deleteAccount(userId);
+    if (error == null) {
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    }
+    return error;
   }
 
   void clearError() => state = state.copyWith(clearError: true);

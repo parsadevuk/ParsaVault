@@ -95,9 +95,44 @@ class UserRepository {
     });
   }
 
+  Future<void> updateFullName(String userId, String fullName) async {
+    await _users.doc(userId).update({
+      'fullName': fullName.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> updateProfilePicture(String userId, String? base64Image) async {
     await _users.doc(userId).update({
       'profilePicture': base64Image,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Deletes all Firestore data for this user (holdings, transactions, profile).
+  Future<void> deleteUserData(String userId) async {
+    final userDoc = _users.doc(userId);
+
+    // Delete holdings sub-collection
+    final holdings = await userDoc.collection('holdings').get();
+    for (final doc in holdings.docs) {
+      await doc.reference.delete();
+    }
+
+    // Delete transactions sub-collection
+    final transactions = await userDoc.collection('transactions').get();
+    for (final doc in transactions.docs) {
+      await doc.reference.delete();
+    }
+
+    // Delete user document
+    await userDoc.delete();
+  }
+
+  Future<void> updateLocation(String userId, String city, String country) async {
+    await _users.doc(userId).update({
+      'city': city.trim(),
+      'country': country.trim(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

@@ -6,6 +6,8 @@ class User {
   final String username;
   final String email;
   final String? website;
+  final String city;
+  final String country;
   final String passwordHash;
   final double cashBalance;
   final int xp;
@@ -21,6 +23,8 @@ class User {
     required this.username,
     required this.email,
     this.website,
+    this.city = 'London',
+    this.country = 'UK',
     required this.passwordHash,
     required this.cashBalance,
     required this.xp,
@@ -38,6 +42,8 @@ class User {
     String? email,
     String? website,
     bool clearWebsite = false,
+    String? city,
+    String? country,
     String? passwordHash,
     double? cashBalance,
     int? xp,
@@ -54,6 +60,8 @@ class User {
       username: username ?? this.username,
       email: email ?? this.email,
       website: clearWebsite ? null : (website ?? this.website),
+      city: city ?? this.city,
+      country: country ?? this.country,
       passwordHash: passwordHash ?? this.passwordHash,
       cashBalance: cashBalance ?? this.cashBalance,
       xp: xp ?? this.xp,
@@ -74,6 +82,8 @@ class User {
       'username': username,
       'email': email,
       'website': website,
+      'city': city,
+      'country': country,
       'cashBalance': cashBalance,
       'xp': xp,
       'level': level,
@@ -92,6 +102,8 @@ class User {
       username: data['username'] as String? ?? '',
       email: data['email'] as String? ?? '',
       website: data['website'] as String?,
+      city: data['city'] as String? ?? 'London',
+      country: data['country'] as String? ?? 'UK',
       passwordHash: '',
       cashBalance: (data['cashBalance'] as num?)?.toDouble() ?? 0.0,
       xp: (data['xp'] as num?)?.toInt() ?? 0,

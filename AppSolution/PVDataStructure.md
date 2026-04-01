@@ -232,7 +232,7 @@ User enters current password + new password → Verify current password hash →
 | First ever trade | +50 | One-time bonus, triggers on first buy only |
 | Buy any asset | +10 | Every buy trade |
 | Sell at a profit | +25 + bonus | Base 25, plus 1 XP per 1% return (capped at +50 bonus) |
-| Sell at a loss | +5 | Still learning — reward participation |
+| Sell at a loss | -5 | Still learning — reward participation |
 | Sell at break-even | +10 | Same as a buy |
 | Deposit cash | +5 | Each deposit |
 | Withdraw cash | +5 | Each withdrawal |

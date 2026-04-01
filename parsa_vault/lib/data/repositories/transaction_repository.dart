@@ -15,6 +15,24 @@ class TransactionRepository {
     return q.docs.map((doc) => AppTransaction.fromFirestore(doc)).toList();
   }
 
+  /// Fetches [limit] transactions ordered by newest first.
+  /// Pass [after] (returned from a previous call) to get the next page.
+  Future<({List<AppTransaction> items, DocumentSnapshot? cursor})> findPaged(
+    String userId, {
+    int limit = 40,
+    DocumentSnapshot? after,
+  }) async {
+    Query<Map<String, dynamic>> q = _txns(userId)
+        .orderBy('timestamp', descending: true)
+        .limit(limit);
+    if (after != null) q = q.startAfterDocument(after);
+    final snap = await q.get();
+    return (
+      items: snap.docs.map((d) => AppTransaction.fromFirestore(d)).toList(),
+      cursor: snap.docs.isNotEmpty ? snap.docs.last : null,
+    );
+  }
+
   Future<int> getXpForPeriod(
     String userId,
     DateTime start,

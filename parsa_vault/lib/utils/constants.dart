@@ -12,10 +12,10 @@ class AppConstants {
   static const int xpFirstTrade = 50;
   static const int xpBuy = 10;
   static const int xpSellProfit = 25;
-  static const int xpSellLoss = 5;
+  static const int xpSellLoss = -5; // Penalty: selling at a loss costs XP
   static const int xpSellBreakEven = 10;
-  static const int xpDeposit = -10; // Penalty: depositing fake cash costs XP
-  static const int xpWithdraw = 10; // Reward: withdrawing shows confidence
+  static const int xpDeposit = 5;  // Reward: each deposit
+  static const int xpWithdraw = 5; // Reward: each withdrawal
   static const int xpDailyLogin = 5;
   static const int xpProfitBonusMax = 50;
 

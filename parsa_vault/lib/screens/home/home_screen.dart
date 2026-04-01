@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/portfolio_provider.dart';
 import '../../providers/market_provider.dart';
 import '../../providers/navigation_provider.dart';
+import '../../providers/leaderboard_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/formatters.dart';
@@ -11,6 +14,21 @@ import '../../widgets/common/xp_progress_bar.dart';
 import '../../widgets/common/empty_state.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../trade/trade_screen.dart';
+
+// ── Background image per country ─────────────────────────────────────────────
+
+String _backgroundForCountry(String country) {
+  switch (country.trim().toLowerCase()) {
+    case 'uk':
+    case 'united kingdom':
+    case 'england':
+      return 'assets/images/home_bg_london.png';
+    default:
+      return 'assets/images/home_bg_london.png'; // fallback until more are added
+  }
+}
+
+// ── Home Screen ───────────────────────────────────────────────────────────────
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -20,6 +38,7 @@ class HomeScreen extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
     final portfolio = ref.watch(portfolioProvider);
     final market = ref.watch(marketProvider);
+    final leaderboardAsync = ref.watch(leaderboardProvider);
 
     if (user == null) return const SizedBox.shrink();
 
@@ -27,6 +46,10 @@ class HomeScreen extends ConsumerWidget {
         ref.read(portfolioProvider.notifier).getPortfolioValue();
     final holdingsValue =
         ref.read(portfolioProvider.notifier).getHoldingsValue();
+
+    // Top 3 leaderboard users (exclude self)
+    final top3 = leaderboardAsync.whenData((users) =>
+        users.where((u) => u.id != user.id).take(3).toList());
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -38,61 +61,24 @@ class HomeScreen extends ConsumerWidget {
         },
         child: CustomScrollView(
           slivers: [
-            // Header
+            // ── Hero header card ──────────────────────────────────────────────
             SliverToBoxAdapter(
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${AppFormatters.greeting()},',
-                              style: AppTextStyles.caption),
-                          Text(user.firstName,
-                              style: AppTextStyles.greetingText),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const LeaderboardScreen()),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: AppColors.goldLight,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.emoji_events_outlined,
-                              size: 22, color: AppColors.gold),
-                        ),
-                      ),
-                    ],
-                  ),
+              child: _HeroHeader(
+                user: user,
+                totalValue: totalValue,
+                holdingsValue: holdingsValue,
+                top3: top3.value ?? [],
+                onLeaderboard: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const LeaderboardScreen()),
                 ),
               ),
             ),
 
-            // Portfolio card
+            // ── XP bar ───────────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                child: _PortfolioCard(
-                  totalValue: totalValue,
-                  cashBalance: user.cashBalance,
-                  holdingsValue: holdingsValue,
-                ),
-              ),
-            ),
-
-            // XP bar
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -111,16 +97,16 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
-            // Holdings title
+            // ── Holdings title ────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
-                child:
-                    Text('My Holdings', style: AppTextStyles.sectionHeading),
+                child: Text('My Holdings',
+                    style: AppTextStyles.sectionHeading),
               ),
             ),
 
-            // Holdings list or empty state
+            // ── Holdings list or empty state ──────────────────────────────────
             if (portfolio.holdings.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -143,10 +129,6 @@ class HomeScreen extends ConsumerWidget {
                     if (asset == null) return const SizedBox.shrink();
 
                     final currentValue = h.shares * asset.currentPrice;
-
-                    // P&L = (currentPrice - avgBuyPrice) / avgBuyPrice * 100
-                    // This reflects the user's actual profit/loss on their position,
-                    // not the 24hr market change.
                     final pnlAmount =
                         (asset.currentPrice - h.averageBuyPrice) * h.shares;
                     final pnlPercent =
@@ -160,15 +142,13 @@ class HomeScreen extends ConsumerWidget {
                         InkWell(
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    TradeScreen(asset: asset)),
+                                builder: (_) => TradeScreen(asset: asset)),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 24, vertical: 12),
                             child: Row(
                               children: [
-                                // Asset icon
                                 Container(
                                   width: 44,
                                   height: 44,
@@ -191,7 +171,6 @@ class HomeScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                // Name + shares
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -213,16 +192,12 @@ class HomeScreen extends ConsumerWidget {
                                     ],
                                   ),
                                 ),
-                                // Value + P&L %
                                 Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text(
-                                        AppFormatters.currency(currentValue),
+                                    Text(AppFormatters.currency(currentValue),
                                         style: AppTextStyles.priceSmall),
                                     const SizedBox(height: 3),
-                                    // P&L percentage (profit/loss on position)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 6, vertical: 2),
@@ -237,8 +212,7 @@ class HomeScreen extends ConsumerWidget {
                                       ),
                                       child: Text(
                                         '${isProfitable ? '+' : ''}${pnlPercent.toStringAsFixed(2)}%',
-                                        style: AppTextStyles.caption
-                                            .copyWith(
+                                        style: AppTextStyles.caption.copyWith(
                                           color: isProfitable
                                               ? AppColors.successGreen
                                               : AppColors.dangerRed,
@@ -249,8 +223,7 @@ class HomeScreen extends ConsumerWidget {
                                     const SizedBox(height: 2),
                                     Text(
                                       '${isProfitable ? '+' : ''}${AppFormatters.currency(pnlAmount)}',
-                                      style: AppTextStyles.caption
-                                          .copyWith(
+                                      style: AppTextStyles.caption.copyWith(
                                         color: isProfitable
                                             ? AppColors.successGreen
                                             : AppColors.dangerRed,
@@ -271,7 +244,10 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 32),
+            ),
           ],
         ),
       ),
@@ -279,56 +255,189 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _PortfolioCard extends StatelessWidget {
-  final double totalValue;
-  final double cashBalance;
-  final double holdingsValue;
+// ── Hero Header ───────────────────────────────────────────────────────────────
 
-  const _PortfolioCard({
+class _HeroHeader extends StatelessWidget {
+  final User user;
+  final double totalValue;
+  final double holdingsValue;
+  final List<User> top3;
+  final VoidCallback onLeaderboard;
+
+  const _HeroHeader({
+    required this.user,
     required this.totalValue,
-    required this.cashBalance,
     required this.holdingsValue,
+    required this.top3,
+    required this.onLeaderboard,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bgAsset = _backgroundForCountry(user.country);
+
+    // Decode avatar
+    ImageProvider? avatarImage;
+    if (user.profilePicture != null && user.profilePicture!.isNotEmpty) {
+      try {
+        avatarImage = MemoryImage(base64Decode(user.profilePicture!));
+      } catch (_) {}
+    }
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.softWhite,
-        borderRadius: BorderRadius.circular(12),
-        border: const Border(
-            left: BorderSide(color: AppColors.gold, width: 4)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        image: DecorationImage(
+          image: AssetImage(bgAsset),
+          fit: BoxFit.cover,
+          alignment: Alignment.bottomCenter,
+        ),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Text('Total Portfolio Value',
-              style: AppTextStyles.caption
-                  .copyWith(letterSpacing: 0.5)),
-          const SizedBox(height: 6),
-          Text(AppFormatters.currency(totalValue),
-              style: AppTextStyles.priceLarge),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                  child: _MiniCard(
-                      label: 'Cash',
-                      value: AppFormatters.currency(cashBalance))),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: _MiniCard(
-                      label: 'Holdings',
-                      value: AppFormatters.currency(holdingsValue))),
-            ],
+          // Gradient overlay — darkest top, lighter bottom
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.65),
+                  Colors.black.withValues(alpha: 0.45),
+                  Colors.black.withValues(alpha: 0.25),
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
+          ),
+
+          // Content
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Column(
+                children: [
+                  // Top row — leaderboard button right
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GestureDetector(
+                        onTap: onLeaderboard,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.4),
+                                width: 1),
+                          ),
+                          child: const Icon(Icons.emoji_events_outlined,
+                              size: 20, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Avatar
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.gold,
+                      image: avatarImage != null
+                          ? DecorationImage(
+                              image: avatarImage, fit: BoxFit.cover)
+                          : null,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: avatarImage == null
+                        ? Center(
+                            child: Text(
+                              user.initials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Full name
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  // City, Country
+                  Text(
+                    '${user.city}, ${user.country}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Top 3 leaderboard avatars
+                  if (top3.isNotEmpty) _LeaderboardAvatars(users: top3),
+                  const SizedBox(height: 20),
+
+                  // Stats card
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 0),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 18, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 20,
+                          offset: const Offset(0, -4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        _StatColumn(
+                            label: 'Total',
+                            value: AppFormatters.currency(totalValue)),
+                        _VertDivider(),
+                        _StatColumn(
+                            label: 'Holdings',
+                            value: AppFormatters.currency(holdingsValue)),
+                        _VertDivider(),
+                        _StatColumn(
+                            label: 'Cash',
+                            value: AppFormatters.currency(user.cashBalance)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -336,30 +445,128 @@ class _PortfolioCard extends StatelessWidget {
   }
 }
 
-class _MiniCard extends StatelessWidget {
-  final String label;
-  final String value;
-  const _MiniCard({required this.label, required this.value});
+// ── Leaderboard mini-avatars ──────────────────────────────────────────────────
+
+class _LeaderboardAvatars extends StatelessWidget {
+  final List<User> users;
+  const _LeaderboardAvatars({required this.users});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.borderGrey),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    // Show up to 3, staggered: outer two smaller+higher, middle larger+lower
+    final show = users.take(3).toList();
+    const sizes = [32.0, 40.0, 32.0];
+    const offsets = [-6.0, 4.0, -6.0]; // vertical offset
+
+    return SizedBox(
+      height: 52,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
         children: [
-          Text(label, style: AppTextStyles.caption),
-          const SizedBox(height: 4),
-          Text(value,
-              style: AppTextStyles.priceMedium.copyWith(fontSize: 16),
-              overflow: TextOverflow.ellipsis),
+          for (int i = 0; i < show.length; i++)
+            Positioned(
+              bottom: offsets[i] < 0 ? -offsets[i] : 0,
+              left: i == 0 ? 0 : i == 1 ? sizes[0] - 8 : sizes[0] + sizes[1] - 16,
+              child: Transform.translate(
+                offset: Offset(0, offsets[i]),
+                child: _MiniAvatar(user: show[i], size: sizes[i]),
+              ),
+            ),
+          // Invisible sized box to give the stack a proper width
+          SizedBox(width: sizes[0] + sizes[1] + sizes[2] - 16, height: 52),
         ],
       ),
+    );
+  }
+}
+
+class _MiniAvatar extends StatelessWidget {
+  final User user;
+  final double size;
+  const _MiniAvatar({required this.user, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    ImageProvider? image;
+    if (user.profilePicture != null && user.profilePicture!.isNotEmpty) {
+      try {
+        image = MemoryImage(base64Decode(user.profilePicture!));
+      } catch (_) {}
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.gold,
+        image: image != null
+            ? DecorationImage(image: image, fit: BoxFit.cover)
+            : null,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: image == null
+          ? Center(
+              child: Text(
+                user.initials,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: size * 0.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+// ── Stat column + divider ─────────────────────────────────────────────────────
+
+class _StatColumn extends StatelessWidget {
+  final String label;
+  final String value;
+  const _StatColumn({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.nearBlack,
+            ),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.mediumGrey,
+              fontWeight: FontWeight.w400,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VertDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 32,
+      color: AppColors.borderGrey,
     );
   }
 }

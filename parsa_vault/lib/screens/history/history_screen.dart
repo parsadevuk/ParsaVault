@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/portfolio_provider.dart';
-import '../../providers/navigation_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../models/app_transaction.dart';
+import '../../providers/history_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/formatters.dart';
@@ -17,27 +19,35 @@ class HistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
-  String _filter = 'All';
+  final _scrollController = ScrollController();
 
-  List<AppTransaction> _filtered(List<AppTransaction> txs) {
-    switch (_filter) {
-      case 'Buys':
-        return txs.where((t) => t.isBuy).toList();
-      case 'Sells':
-        return txs.where((t) => t.isSell).toList();
-      case 'Deposits':
-        return txs.where((t) => t.isDeposit).toList();
-      case 'Withdrawals':
-        return txs.where((t) => t.isWithdraw).toList();
-      default:
-        return txs;
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.extentAfter < 300) {
+      final state = ref.read(historyProvider);
+      if (state.hasMore && !state.isLoadingMore && !state.isLoading) {
+        ref.read(historyProvider.notifier).loadMore();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final portfolio = ref.watch(portfolioProvider);
-    final filtered = _filtered(portfolio.transactions);
+    final state = ref.watch(historyProvider);
+    final filtered = state.filtered;
 
     // Group by date
     final Map<String, List<AppTransaction>> grouped = {};
@@ -55,11 +65,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child:
-                  Text('Transaction History', style: AppTextStyles.screenTitle),
+              child: Text('Transaction History', style: AppTextStyles.screenTitle),
             ),
 
-            // Filter pills — scrollable so all 5 fit on any screen width
+            // ── Filter pills ───────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
               child: SingleChildScrollView(
@@ -68,9 +77,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 child: Row(
                   children: ['All', 'Buys', 'Sells', 'Deposits', 'Withdrawals']
                       .map((label) {
-                    final active = _filter == label;
+                    final active = state.filter == label;
                     return GestureDetector(
-                      onTap: () => setState(() => _filter = label),
+                      onTap: () =>
+                          ref.read(historyProvider.notifier).setFilter(label),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         margin: const EdgeInsets.only(right: 8),
@@ -96,54 +106,159 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
             const SizedBox(height: 8),
 
+            // ── Content ────────────────────────────────────────────────────
             Expanded(
-              child: RefreshIndicator(
-                color: AppColors.gold,
-                onRefresh: () =>
-                    ref.read(portfolioProvider.notifier).loadAll(),
-                child: filtered.isEmpty
-                    ? ListView(
-                        // ListView needed so RefreshIndicator works on empty state
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.55,
-                            child: EmptyState(
-                              icon: Icons.receipt_long_outlined,
-                              title: 'No trades yet.',
-                              body: 'Make your first trade and it\'ll show up here.',
-                              buttonLabel: 'Go to Markets',
-                              onButtonTap: () {
-                                ref.read(navigationIndexProvider.notifier).state = 1;
-                              },
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.only(top: 8, bottom: 24),
-                        children: [
-                          for (final entry in grouped.entries) ...[
-                            // Date header
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                              child: Text(
-                                entry.key,
-                                style: AppTextStyles.captionBold
-                                    .copyWith(fontSize: 13),
-                              ),
-                            ),
-                            for (final tx in entry.value) ...[
-                              TransactionTile(tx: tx),
-                              const SizedBox(height: 8),
-                            ],
-                          ],
-                        ],
+              child: state.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.gold,
                       ),
-              ),
+                    )
+                  : RefreshIndicator(
+                      color: AppColors.gold,
+                      onRefresh: () =>
+                          ref.read(historyProvider.notifier).refresh(),
+                      child: filtered.isEmpty
+                          ? ListView(
+                              controller: _scrollController,
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.55,
+                                  child: EmptyState(
+                                    icon: Icons.receipt_long_outlined,
+                                    title: 'No trades yet.',
+                                    body:
+                                        'Make your first trade and it\'ll show up here.',
+                                    buttonLabel: 'Go to Markets',
+                                    onButtonTap: () {
+                                      ref
+                                          .read(navigationIndexProvider.notifier)
+                                          .state = 1;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(top: 8),
+                              itemCount: _itemCount(grouped, state),
+                              itemBuilder: (context, index) =>
+                                  _buildItem(context, index, grouped, state),
+                            ),
+                    ),
             ),
           ],
         ),
       ),
     );
   }
+
+  // Build flat index list: date-header → tiles → (optional) load-more footer
+  int _itemCount(
+    Map<String, List<AppTransaction>> grouped,
+    HistoryState state,
+  ) {
+    // Each group = 1 header + N tiles
+    int count = grouped.entries
+        .fold(0, (sum, e) => sum + 1 + e.value.length);
+    count += 1; // footer (spinner or end label)
+    return count;
+  }
+
+  Widget? _buildItem(
+    BuildContext context,
+    int index,
+    Map<String, List<AppTransaction>> grouped,
+    HistoryState state,
+  ) {
+    // Flatten grouped map into a list of items
+    final flatItems = <_HistoryItem>[];
+    for (final entry in grouped.entries) {
+      flatItems.add(_HistoryItem.header(entry.key));
+      for (final tx in entry.value) {
+        flatItems.add(_HistoryItem.tile(tx));
+      }
+    }
+
+    // Footer is the last item
+    if (index == flatItems.length) {
+      return _buildFooter(context, state);
+    }
+
+    final item = flatItems[index];
+    if (item.isHeader) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+        child: Text(
+          item.header!,
+          style: AppTextStyles.captionBold.copyWith(fontSize: 13),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        TransactionTile(tx: item.tx!),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildFooter(BuildContext context, HistoryState state) {
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.gold,
+            ),
+          ),
+        ),
+      );
+    }
+    if (!state.hasMore) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          16,
+          24,
+          MediaQuery.of(context).padding.bottom + 24,
+        ),
+        child: Center(
+          child: Text(
+            'All transactions loaded',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppColors.mediumGrey,
+            ),
+          ),
+        ),
+      );
+    }
+    return SizedBox(height: MediaQuery.of(context).padding.bottom + 24);
+  }
+}
+
+// ── Helper ─────────────────────────────────────────────────────────────────────
+
+class _HistoryItem {
+  final String? header;
+  final AppTransaction? tx;
+
+  const _HistoryItem._({this.header, this.tx});
+
+  factory _HistoryItem.header(String label) =>
+      _HistoryItem._(header: label);
+  factory _HistoryItem.tile(AppTransaction tx) =>
+      _HistoryItem._(tx: tx);
+
+  bool get isHeader => header != null;
 }

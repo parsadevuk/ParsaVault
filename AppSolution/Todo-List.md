@@ -64,13 +64,13 @@
 - [x] 40 mock assets — 20 stocks + 20 crypto with live price simulation
 - [x] SQLite local database with migration (v1 → v2)
 - [x] Riverpod state management
-- [x] XP system — buy, sell, deposit (−10 XP), withdraw (+10 XP), daily login, first trade bonus
+- [x] XP system — buy (+10), sell profit (+25 + bonus), sell at loss (−5), sell break-even (+10), deposit (+5), withdraw (+5), daily login (+5), first trade (+50)
 - [x] Level system — 10 levels with titles (Apprentice → Vault Master)
 - [x] Profile picture — image_picker, base64 stored in SQLite
 - [x] Home P&L — shows actual profit/loss based on average buy price
 - [x] Trade screen — 3 decimal places, shares/amount toggle, % quick buttons (buy + sell), keyboard dismiss
 - [x] History page — filter pills for All / Buys / Sells / Deposits / Withdrawals
-- [x] Profile page — red Deposit (−10 XP) / green Withdraw (+10 XP), edit website, logout redesign
+- [x] Profile page — Deposit (+5 XP) / Withdraw (+5 XP), edit website, logout redesign, SSO password check, delete account
 - [x] Leaderboard — live XP via ref.watch, UTC/Greenwich time, week starts Monday
 - [x] SSO buttons UI — Apple, Google, Microsoft (wired to Firebase, activates when providers enabled)
 - [x] Firebase project created — iOS + Android configured, firebase_options.dart generated

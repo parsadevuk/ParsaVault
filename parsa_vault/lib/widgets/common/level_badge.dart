@@ -8,6 +8,8 @@ class LevelBadge extends StatelessWidget {
 
   const LevelBadge({super.key, required this.level, this.compact = false});
 
+  static String labelForLevel(int level) => 'LVL $level';
+
   @override
   Widget build(BuildContext context) {
     return Container(

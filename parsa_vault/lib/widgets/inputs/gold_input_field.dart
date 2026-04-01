@@ -19,6 +19,7 @@ class GoldInputField extends StatefulWidget {
   final FocusNode? focusNode;
   final VoidCallback? onEditingComplete;
   final ValueChanged<String>? onChanged;
+  final bool enabled;
 
   const GoldInputField({
     super.key,
@@ -37,6 +38,7 @@ class GoldInputField extends StatefulWidget {
     this.focusNode,
     this.onEditingComplete,
     this.onChanged,
+    this.enabled = true,
   });
 
   @override
@@ -74,6 +76,7 @@ class _GoldInputFieldState extends State<GoldInputField> {
           focusNode: widget.focusNode,
           onEditingComplete: widget.onEditingComplete,
           onChanged: widget.onChanged,
+          enabled: widget.enabled,
           style: AppTextStyles.inputText,
           decoration: InputDecoration(
             hintText: widget.hint,

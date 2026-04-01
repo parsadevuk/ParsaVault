@@ -40,6 +40,13 @@ class AuthService {
   /// Whether the current Firebase user has verified their email.
   bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
 
+  /// True if the current user signed in via SSO (no email/password provider).
+  bool get currentUserIsSso {
+    final fbUser = _auth.currentUser;
+    if (fbUser == null) return false;
+    return fbUser.providerData.every((p) => p.providerId != 'password');
+  }
+
   // ── Email + Password ──────────────────────────────────────────────────────
 
   Future<AuthResult> register({
@@ -292,8 +299,44 @@ class AuthService {
     await _userRepo.updateProfilePicture(userId, base64Image);
   }
 
+  Future<void> updateLocation(String userId, String city, String country) async {
+    await _userRepo.updateLocation(userId, city, country);
+  }
+
+  Future<void> updateFullName(String userId, String fullName) async {
+    await _userRepo.updateFullName(userId, fullName.trim());
+  }
+
+  /// Returns error string if username taken, null if success.
+  Future<String?> updateUsername(String userId, String newUsername) async {
+    final trimmed = newUsername.trim().toLowerCase();
+    final existing = await _userRepo.findByUsername(trimmed);
+    if (existing != null && existing.id != userId) {
+      return 'Username already taken. Please choose another.';
+    }
+    await _userRepo.updateUsername(userId, trimmed);
+    return null;
+  }
+
   Future<void> updateWebsite(String userId, String? website) async {
     await _userRepo.updateWebsite(userId, website);
+  }
+
+  /// Deletes all Firestore data and Firebase Auth account.
+  /// Returns null on success, or an error message string.
+  Future<String?> deleteAccount(String userId) async {
+    try {
+      await _userRepo.deleteUserData(userId);
+      await _auth.currentUser?.delete();
+      return null;
+    } on fb.FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        return 'Please log out and sign in again before deleting your account.';
+      }
+      return e.message ?? 'Failed to delete account.';
+    } catch (e) {
+      return 'Failed to delete account. Please try again.';
+    }
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

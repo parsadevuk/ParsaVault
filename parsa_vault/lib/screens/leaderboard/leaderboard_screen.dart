@@ -114,8 +114,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                 controller: _tabController,
                 tabs: const [
                   Tab(text: 'All Time'),
-                  Tab(text: 'This Week'),
-                  Tab(text: 'Today'),
+                  Tab(text: 'Weekly'),
+                  Tab(text: 'Daily'),
                 ],
               ),
             ),
@@ -150,22 +150,18 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
                         showComingSoon: false,
                         onRefresh: doRefresh,
                       ),
-                      // Weekly — current user only for now
+                      // Weekly — all users, live from Firestore
                       _LeaderboardList(
-                        entries: entries
-                            .where((e) => e.isCurrentUser)
-                            .toList(),
+                        entries: entries,
                         periodLabel: _periodLabel('weekly'),
-                        showComingSoon: true,
+                        showComingSoon: false,
                         onRefresh: doRefresh,
                       ),
-                      // Daily — current user only for now
+                      // Daily — all users, live from Firestore
                       _LeaderboardList(
-                        entries: entries
-                            .where((e) => e.isCurrentUser)
-                            .toList(),
+                        entries: entries,
                         periodLabel: _periodLabel('daily'),
-                        showComingSoon: true,
+                        showComingSoon: false,
                         onRefresh: doRefresh,
                       ),
                     ],
