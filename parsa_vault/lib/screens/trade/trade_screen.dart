@@ -123,12 +123,6 @@ class _TradeScreenState extends ConsumerState<TradeScreen> {
     _validate();
   }
 
-  String _trimTo3(double val) {
-    // Show up to 3 decimal places, strip trailing zeros
-    final s = val.toStringAsFixed(3);
-    return s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
-  }
-
   String _trimTo5(double val) {
     // Show up to 5 decimal places (floored shares), strip trailing zeros
     final s = val.toStringAsFixed(5);

@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Phone only — excludes tablets from App Store & Google Play -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="false"
+        android:xlargeScreens="false" />
     <application
         android:label="Parsa Vault"
         android:name="${applicationName}"

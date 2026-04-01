@@ -52,11 +52,11 @@ class WelcomeScreen extends StatelessWidget {
                 children: [
                   const Spacer(flex: 5),
 
-                  // App logo
+                  // App logo (2x)
                   Image.asset(
                     'assets/images/logo_transparent_full.png',
-                    width: 320,
-                    height: 320,
+                    width: 640,
+                    height: 640,
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 18),

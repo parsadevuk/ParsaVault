@@ -10,7 +10,6 @@ import '../../widgets/inputs/gold_input_field.dart';
 import '../main/main_navigation.dart';
 import 'register_screen.dart';
 import 'sso_complete_profile_screen.dart';
-import 'welcome_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
